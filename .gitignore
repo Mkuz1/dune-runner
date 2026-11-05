@@ -24,3 +24,9 @@ _to_delete/
 
 # stale August copy of the web build; the live game is app/src/main/assets/game/
 dune-runner-web/
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+ios/build/

@@ -10,8 +10,8 @@ android {
         applicationId "dev.dunerunner.game"
         minSdk 24                 // Android 7.0 — the oldest with a reliably
         targetSdk 34              // updatable WebView that supports WebGL 2
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
     }
 
     /* Release signing. Create keystore.properties next to this module (it is

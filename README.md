@@ -1,3 +1,21 @@
+# Dune Runner
+
+Open-world off-road driving and flight game — one game, three targets:
+
+| Target | Where | Output |
+|---|---|---|
+| Website | `app/src/main/assets/game/` | static files for Cloudflare Pages |
+| Android | this Gradle project | `.apk` / `.aab` |
+| iPhone & iPad | `ios/` (Xcode) | `.ipa` — see `ios/README.md` |
+
+**Downloads:** every push to `main` is built by GitHub Actions
+(`.github/workflows/build.yml`) and published under **Releases ▸ Latest build**:
+the Android APK, the iOS IPA and the web zip. Tag a commit `v1.1` (etc.) to
+make a permanent release. Add the Cloudflare secrets described at the top of
+the workflow and the website redeploys on every push too.
+
+---
+
 # Dune Runner — Android app
 
 A complete Android Studio project. The whole game ships inside
