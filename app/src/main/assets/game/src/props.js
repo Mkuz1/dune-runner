@@ -9,6 +9,10 @@
 import * as THREE from '../libs/three/three.module.js';
 import { mergeGeometries } from '../libs/three/addons/utils/BufferGeometryUtils.js';
 import { makeRandom } from './noise.js';
+import {
+  makePineCards, makeBirchCards, makeAcaciaCards, makeBushCards,
+  makeCardMaterial, patchCardMaterial
+} from './trees.js';
 
 const C = new THREE.Color();
 
@@ -494,5 +498,18 @@ export function buildPropLibrary(textures, quality) {
   };
   // which family uses which material
   lib.staticFamilies = new Set(['rock', 'wood']);
+
+  /* Photo-card trees replace the solid ones whenever the foliage atlases
+     loaded (every tier but low). Same seeds, so the forest keeps its mix. */
+  if (textures.pineCards && textures.leafCards) {
+    lib.pineCardMat = patchCardMaterial(addWind(
+      makeCardMaterial(textures.pineCards, textures.pineCardsA), clock, 1.4, 0.7));
+    lib.leafCardMat = patchCardMaterial(addWind(
+      makeCardMaterial(textures.leafCards, textures.leafCardsA), clock, 1.4, 0.7));
+    lib.pine = [7, 19, 88, 151].map(sd => makePineCards(sd, detail));
+    lib.birch = [101, 211].map(sd => makeBirchCards(sd, detail));
+    lib.acacia = [11, 77].map(sd => makeAcaciaCards(sd, detail));
+    lib.bush = [makeBushCards(41, false, detail), makeBushCards(43, true, detail), makeBushCards(47, false, detail)];
+  }
   return lib;
 }

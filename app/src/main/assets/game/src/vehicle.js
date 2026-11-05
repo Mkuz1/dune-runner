@@ -160,6 +160,7 @@ function buildWheel() {
 export class Vehicle {
   constructor(scene, quality, textures) {
     this.q = quality;
+    this.textures = textures;
     this.group = new THREE.Group();
     this.group.name = 'vehicle';
     scene.add(this.group);
@@ -624,7 +625,95 @@ export class Vehicle {
       this.glowRear[1].position.set(0.90, 1.27, -2.99);
     }
     this.modelLoaded = true;
+    this.addGrime();
     return true;
+  }
+
+  /* ---------------------------------------------------------------- grime
+     A showroom-clean truck is the quickest tell that a car is rendered.
+     This adds what a few days off-road leave behind, in the shader so it
+     costs no extra geometry or textures:
+       • heavy tan dust on the lower body, wheels and chassis, fading up
+         the doors along a ragged edge taken from the dirt photo-scan;
+       • a light film on upward-facing panels (bonnet, roof, rails);
+       • dusty areas lose their clear coat and go matte.
+     Positions are measured in the truck's own space (origin at ground
+     level), so the dirt stays put however the truck tilts or flies. */
+  addGrime() {
+    const tex = this.textures;
+    if (!tex || !tex.dirt || (this.q && this.q.tier === 'low')) return;
+    const U = this.grimeU = {
+      uBodyInv: { value: new THREE.Matrix4() },
+      tGrime: { value: tex.dirt },
+      uDustColor: { value: new THREE.Color(0.34, 0.255, 0.17) }
+    };
+    // how much each surface collects: tyres and chassis the most
+    const amount = {
+      paint: 1.0, roof: 1.0, trim: 0.9, grille: 0.8, metal: 1.0, chassis: 1.1,
+      rubber: 0.5, gunmetal: 1.0, silver: 0.9, red: 1.0, orange: 1.0, yellow: 1.0,
+      chrome: 0.6, gold: 0.8
+    };
+    // the paint: a little less blinding, and more of the sky in it
+    this.M.paint.color.set(0xdde1e3);
+    this.M.paint.envMapIntensity = 1.25;
+
+    for (const key in amount) {
+      const m = this.M[key];
+      if (!m || m.userData.grime) continue;
+      m.userData.grime = true;
+      const k = amount[key];
+      const prev = m.onBeforeCompile;
+      m.onBeforeCompile = (sh, r) => {
+        if (prev) prev.call(m, sh, r);
+        Object.assign(sh.uniforms, U);
+        sh.uniforms.uGrime = { value: k };
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', `#include <common>
+            uniform mat4 uBodyInv;
+            varying vec3 vGrimeP;
+            varying vec3 vGrimeN;`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+            vGrimeP = ( uBodyInv * modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+            vGrimeN = normalize( mat3( uBodyInv ) * mat3( modelMatrix ) * objectNormal );`);
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', `#include <common>
+            uniform sampler2D tGrime;
+            uniform vec3 uDustColor;
+            uniform float uGrime;
+            varying vec3 vGrimeP;
+            varying vec3 vGrimeN;`)
+          .replace('#include <color_fragment>', `#include <color_fragment>
+            float grimeMask = 0.0;
+            {
+              vec3 w = pow( abs( normalize( vGrimeN ) ), vec3( 4.0 ) );
+              w /= ( w.x + w.y + w.z );
+              vec3 q = vGrimeP * 0.9;
+              float dl = dot( texture2D( tGrime, q.zy ).rgb * w.x +
+                              texture2D( tGrime, q.xz ).rgb * w.y +
+                              texture2D( tGrime, q.xy ).rgb * w.z, vec3( 0.333 ) );
+              float fine = dot( texture2D( tGrime, vGrimeP.zy * 3.7 + 0.3 ).rgb, vec3( 0.333 ) );
+              // thrown up by the wheels: heavy low down, ragged edge above
+              float edge = ( dl - 0.25 ) * 1.6 + ( fine - 0.25 ) * 0.6;
+              float low = 1.0 - smoothstep( 0.45, 1.0, vGrimeP.y + edge * 0.4 );
+              // settled dust on anything facing up
+              float top = smoothstep( 0.6, 0.95, normalize( vGrimeN ).y ) * ( 0.08 + 0.14 * fine );
+              grimeMask = clamp( max( low * 0.85, top ) * uGrime, 0.0, 1.0 );
+              vec3 dust = uDustColor * ( 0.72 + 0.6 * dl );
+              diffuseColor.rgb = mix( diffuseColor.rgb, dust, grimeMask * 0.75 );
+            }`)
+          .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+            roughnessFactor = mix( roughnessFactor, 0.93, grimeMask );`)
+          .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+            metalnessFactor *= 1.0 - grimeMask * 0.85;`)
+          .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
+            #ifdef USE_CLEARCOAT
+              material.clearcoat *= 1.0 - grimeMask;
+            #endif`);
+      };
+      const prevKey = m.customProgramCacheKey;
+      m.customProgramCacheKey = () => (prevKey ? prevKey.call(m) : '') + '_grime' + key;
+      m.needsUpdate = true;
+    }
   }
 
   /** Wheel visual state. `compression` is how far the strut is pushed up. */
@@ -660,6 +749,10 @@ export class Vehicle {
   /** Park the contact shadow on the ground under the truck and fade it
       out as the truck climbs away. */
   updateShadow(phys) {
+    if (this.grimeU) {
+      this.group.updateMatrixWorld();
+      this.grimeU.uBodyInv.value.copy(this.group.matrixWorld).invert();
+    }
     const b = this.blob;
     if (!b) return;
     const lift = Math.max(0, phys.pos.y - phys.groundY);

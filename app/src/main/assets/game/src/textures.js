@@ -336,6 +336,50 @@ function imageTexture(img, srgb, aniso, maxSize) {
   return t;
 }
 
+/** Foliage atlas for card trees: an opaque colour canvas (the pixels
+    behind the cut-outs filled with the average leaf colour, so mipmaps
+    never bleed white or black into the edges) plus the alpha mask as a
+    separate alphaMap. Kept separate on purpose: a canvas with real
+    transparency is stored premultiplied, which throws that colour away. */
+async function loadCardAtlas(name, size, aniso) {
+  const [col, mask] = await Promise.all([
+    loadImage(PHOTO_DIR + name + '.jpg'),
+    loadImage(PHOTO_DIR + name + '_a.png')
+  ]);
+  const c = newCanvas(size);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(mask, 0, 0, size, size);
+  const a = ctx.getImageData(0, 0, size, size).data;
+  ctx.drawImage(col, 0, 0, size, size);
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (a[i + 1] > 160) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+  }
+  if (n) {
+    r /= n; g /= n; b /= n;
+    for (let i = 0; i < d.length; i += 4) {
+      if (a[i + 1] < 96) { d[i] = r; d[i + 1] = g; d[i + 2] = b; }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const setup = (t) => {
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.anisotropy = aniso;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.needsUpdate = true;
+    return t;
+  };
+  const colour = setup(new THREE.CanvasTexture(c));
+  colour.colorSpace = THREE.SRGBColorSpace;
+  return [colour, setup(new THREE.Texture(mask))];
+}
+
 /* ================= PUBLIC BUILDER ================= */
 
 export async function buildTextures(quality, onProgress = () => {}) {
@@ -388,6 +432,18 @@ export async function buildTextures(quality, onProgress = () => {}) {
      procedural rock texture; the rock layer is a photo now, so the
      same bake is kept, small, purely as a macro-noise source. */
   out.macro = toTexture(bakeRock(256).canvas, 1, true, 1);   // sRGB, as before
+
+  // photo foliage for the card trees (the low tier keeps the solid ones)
+  if (quality.tier !== 'low') {
+    try {
+      const sz = quality.tier === 'med' ? 512 : 1024;
+      [out.pineCards, out.pineCardsA] = await loadCardAtlas('pine_twig', sz, aniso);
+      [out.leafCards, out.leafCardsA] = await loadCardAtlas('leaf_sprig', sz, aniso);
+    } catch (e) {
+      console.warn('[textures] foliage atlas failed — using solid trees:', e.message);
+      out.pineCards = out.leafCards = null;
+    }
+  }
 
   out.tuft = bakeTuft(quality.tier === 'low' ? 128 : 224);
   out.needles = bakeNeedles(quality.tier === 'low' ? 160 : 256);

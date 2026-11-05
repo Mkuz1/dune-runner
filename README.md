@@ -30,9 +30,11 @@ together with a `version.json`. Both apps read that file when they start
 Versions come from the workflow run number (`versionCode` = run + 10,
 `versionName` = 1.2.run). One-time setup of the CI secrets: `./set-ci-secrets.sh`.
 
-**Ground textures** are CC0 photogrammetry scans from
-[Poly Haven](https://polyhaven.com) in `app/src/main/assets/game/textures/`;
-the game falls back to its procedural textures if they are missing.
+**Ground textures** and the **tree foliage** (scanned pine twigs and leaf
+sprigs, used on the photo-card trees in `src/trees.js`) are CC0 assets from
+[Poly Haven](https://polyhaven.com) in `app/src/main/assets/game/textures/`.
+If they are missing the game falls back to its procedural textures and solid
+trees; the Low quality preset always uses the solid trees.
 
 ---
 

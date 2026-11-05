@@ -503,24 +503,33 @@ class ChunkJob {
       const list = buckets[kind];
       if (!list.length) continue;
       const variants = lib[kind];
-      const geo = variants[(Math.abs(this.cx * 31 + this.cz * 17)) % variants.length];
-      const material = lib.staticFamilies.has(kind) ? lib.mat : lib.foliageMat;
-      const im = new THREE.InstancedMesh(geo, material, list.length);
-      for (let i = 0; i < list.length; i++) {
-        im.setMatrixAt(i, list[i]);
-        col.setHex(tints[kind][i]);
-        im.setColorAt(i, col);
+      const variant = variants[(Math.abs(this.cx * 31 + this.cz * 17)) % variants.length];
+      // card trees come in parts (bark + foliage) that share the instances
+      const pieces = variant.multi
+        ? variant.multi.map(([g, key]) => [g, lib[key]])
+        : [[variant, lib.staticFamilies.has(kind) ? lib.mat : lib.foliageMat]];
+      for (const [geo, material] of pieces) {
+        const im = new THREE.InstancedMesh(geo, material, list.length);
+        // the green/dry tint is for foliage; a card tree's bark keeps its colour
+        const tinted = !(variant.multi && material === lib.foliageMat);
+        for (let i = 0; i < list.length; i++) {
+          im.setMatrixAt(i, list[i]);
+          if (tinted) {
+            col.setHex(tints[kind][i]);
+            im.setColorAt(i, col);
+          }
+        }
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = this.ring <= t.q.shadowRing;
+        im.receiveShadow = true;
+        im.frustumCulled = true;
+        im.matrixAutoUpdate = false;
+        im.updateMatrix();
+        im.computeBoundingSphere();   // instance matrices are already in world space
+        rec.group.add(im);
+        rec.props.push(im);
       }
-      im.instanceMatrix.needsUpdate = true;
-      if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.castShadow = this.ring <= t.q.shadowRing;
-      im.receiveShadow = true;
-      im.frustumCulled = true;
-      im.matrixAutoUpdate = false;
-      im.updateMatrix();
-      im.computeBoundingSphere();   // instance matrices are already in world space
-      rec.group.add(im);
-      rec.props.push(im);
     }
   }
 }
