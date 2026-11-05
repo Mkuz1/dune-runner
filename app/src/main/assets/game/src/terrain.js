@@ -86,8 +86,12 @@ function makeTerrainMaterial(tex) {
         uniform vec3 gGrass, gSand, gRock, gDirt, gBeach;
         varying vec3 vRoad;
 
+        float farW = 0.0;    // set in main: 0 near → 1 from ~320 m
         vec3 layer( sampler2D t, vec2 uv, float w ){
           vec3 a = texture2D( t, uv ).rgb;
+          // far away, blend in the same photo at a 55 m scale so distant
+          // ground does not repeat every 16 m
+          if ( farW > 0.01 ) a = mix( a, texture2D( t, vec2( -uv.y, uv.x ) * 0.29 + vec2( 0.37, 0.11 ) ).rgb, farW * 0.5 );
           #ifdef ANTI_TILE
             if ( w > 0.004 ) {
               vec3 b = texture2D( t, vec2( uv.y, -uv.x ) * 0.381 + 0.27 ).rgb;
@@ -104,6 +108,8 @@ function makeTerrainMaterial(tex) {
         vec2 uvD = vNormalMapUv * 8.0;      //  2 m close-up detail
         vec2 uvM = vNormalMapUv * 0.125;    // 128 m macro
         vec4 sp  = vSplat;
+
+        farW = smoothstep( 60.0, 320.0, length( vViewPosition ) );
 
         // which of the two anti-tiling samples shows, in ~40 m patches
         float tileW = 0.0;
@@ -165,7 +171,9 @@ function makeTerrainMaterial(tex) {
           terra = mix( terra, terra * ( 0.45 + 1.15 * fine ), near * 0.55 );
         }
 
-        float macro = texture2D( tMacro, uvM ).g;
+        // two unrelated scales (128 m and ~550 m) so the brightness
+        // variation itself never lines up into a grid
+        float macro = texture2D( tMacro, uvM ).g * 0.55 + texture2D( tMacro, vec2( uvM.y, -uvM.x ) * 0.231 + 0.17 ).g * 0.45;
         terra *= 0.76 + 0.48 * macro;
 
         // ambient occlusion baked from the terrain's own curvature

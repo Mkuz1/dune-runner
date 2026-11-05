@@ -380,6 +380,68 @@ async function loadCardAtlas(name, size, aniso) {
   return [colour, setup(new THREE.Texture(mask))];
 }
 
+/* Large blotches are what make a tiled photo look tiled: the same light and
+   dark patches lined up every 16 m are easy to spot from the air, while
+   fine grain repeating is not. This removes everything larger than about
+   1/8 of the tile from a seamless photo — the low-pass is an 8×8 grid of
+   block means read back with wrap-around bilinear filtering, so the result
+   still tiles perfectly — and leaves the large-scale variation to the
+   terrain shader, which has its own non-repeating macro noise.
+     colour: divided by its local mean (keeps hue, drops the blotches)
+     normal: the local average tilt is subtracted (drops the big bumps) */
+function flattenPhoto(img, size, isNormal, amount = 0.9) {
+  const c = newCanvas(size);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, size, size);
+  const im = ctx.getImageData(0, 0, size, size);
+  const d = im.data;
+  const G = 8, bs = size / G;
+  const B = new Float32Array(G * G * 3);
+  for (let y = 0; y < size; y++) {
+    const by = (y / bs | 0) * G;
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4, b = (by + (x / bs | 0)) * 3;
+      B[b] += d[i]; B[b + 1] += d[i + 1]; B[b + 2] += d[i + 2];
+    }
+  }
+  const M = [0, 0, 0];
+  for (let b = 0; b < G * G; b++) {
+    for (let k = 0; k < 3; k++) { B[b * 3 + k] /= bs * bs; M[k] += B[b * 3 + k] / (G * G); }
+  }
+  const low = [0, 0, 0];
+  for (let y = 0; y < size; y++) {
+    const gy = (y + 0.5) / bs - 0.5, y0 = Math.floor(gy), fy = gy - y0;
+    const r0 = ((y0 % G) + G) % G * G, r1 = (((y0 + 1) % G) + G) % G * G;
+    for (let x = 0; x < size; x++) {
+      const gx = (x + 0.5) / bs - 0.5, x0 = Math.floor(gx), fx = gx - x0;
+      const c0 = ((x0 % G) + G) % G, c1 = (((x0 + 1) % G) + G) % G;
+      for (let k = 0; k < 3; k++) {
+        const a = B[(r0 + c0) * 3 + k] * (1 - fx) + B[(r0 + c1) * 3 + k] * fx;
+        const b = B[(r1 + c0) * 3 + k] * (1 - fx) + B[(r1 + c1) * 3 + k] * fx;
+        low[k] = a * (1 - fy) + b * fy;
+      }
+      const i = (y * size + x) * 4;
+      if (isNormal) {
+        const nx = d[i] / 127.5 - 1 - (low[0] / 127.5 - 1) * amount;
+        const ny = d[i + 1] / 127.5 - 1 - (low[1] / 127.5 - 1) * amount;
+        const nz = Math.sqrt(Math.max(0.04, 1 - nx * nx - ny * ny));
+        const inv = 1 / Math.hypot(nx, ny, nz);
+        d[i] = (nx * inv * 0.5 + 0.5) * 255;
+        d[i + 1] = (ny * inv * 0.5 + 0.5) * 255;
+        d[i + 2] = (nz * inv * 0.5 + 0.5) * 255;
+      } else {
+        for (let k = 0; k < 3; k++) {
+          const f = 1 + (M[k] / Math.max(1, low[k]) - 1) * amount;
+          d[i + k] = Math.min(255, d[i + k] * f);
+        }
+      }
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+  return c;
+}
+
 /* ================= PUBLIC BUILDER ================= */
 
 export async function buildTextures(quality, onProgress = () => {}) {
@@ -412,11 +474,14 @@ export async function buildTextures(quality, onProgress = () => {}) {
       const [col, nrm] = pair;
       // a small bake is enough to know the colour the world was tuned for
       const target = meanLinear(fn(64).canvas);
-      const mean = meanLinear(col);
+      const flat = name === 'sand' || name === 'grass';
+      const colSrc = flat ? flattenPhoto(col, Math.min(col.width, photoMax), false) : col;
+      const nrmSrc = flat ? flattenPhoto(nrm, Math.min(nrm.width, photoMax), true) : nrm;
+      const mean = meanLinear(colSrc);
       out.gain[name] = calibrate(mean, target);
       out.photoMean[name] = new THREE.Vector3(mean[0], mean[1], mean[2]);
-      out[name] = imageTexture(col, true, aniso, photoMax);
-      out[name + 'N'] = imageTexture(nrm, false, aniso, photoMax);
+      out[name] = imageTexture(colSrc, true, aniso, photoMax);
+      out[name + 'N'] = imageTexture(nrmSrc, false, aniso, photoMax);
       out[name + 'Photo'] = true;
     } else {
       const res = fn(size);
@@ -449,11 +514,14 @@ export async function buildTextures(quality, onProgress = () => {}) {
         loadImage(PHOTO_DIR + name + '.jpg'),
         withNormal ? loadImage(PHOTO_DIR + name + '_n.jpg') : Promise.resolve(null)
       ]);
-      const mean = meanLinear(col);
+      const flat = name === 'beach';
+      const colSrc = flat ? flattenPhoto(col, Math.min(col.width, photoMax), false) : col;
+      const nrmSrc = flat && nrm ? flattenPhoto(nrm, Math.min(nrm.width, photoMax), true) : nrm;
+      const mean = meanLinear(colSrc);
       out.photoMean[name] = new THREE.Vector3(mean[0], mean[1], mean[2]);
       out.gain[name] = target ? calibrate(mean, meanLinear(target(64).canvas), tint) : new THREE.Vector3(1, 1, 1);
-      out[name] = imageTexture(col, true, aniso, photoMax);
-      if (nrm) out[name + 'N'] = imageTexture(nrm, false, aniso, photoMax);
+      out[name] = imageTexture(colSrc, true, aniso, photoMax);
+      if (nrmSrc) out[name + 'N'] = imageTexture(nrmSrc, false, aniso, photoMax);
     } catch (e) {
       console.warn('[textures]', e.message);
     }
