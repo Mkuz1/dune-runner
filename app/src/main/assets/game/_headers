@@ -14,3 +14,19 @@
 
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
+
+# The service worker decides what is cached offline; it must always be
+# fetched fresh or returning visitors can stay on an old build.
+/sw.js
+  Cache-Control: no-cache
+
+# Photo textures and the truck model change between releases (sw.js bumps
+# its cache name when they do), so keep the HTTP cache short.
+/textures/*
+  Cache-Control: public, max-age=3600
+
+/models/*
+  Cache-Control: public, max-age=3600
+
+/README.md
+  X-Robots-Tag: noindex
