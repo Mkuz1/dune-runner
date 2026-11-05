@@ -33,3 +33,6 @@ ios/build/
 /dist
 releases_deploy_key
 releases_deploy_key.pub
+node_modules/
+test-results/
+playwright-report/
