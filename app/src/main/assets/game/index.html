@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1116" />
+<meta name="description" content="Open-world off-road driving and flight sim — endless forests, desert dunes, beaches and open sea." />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Dune Runner — Open World Off-Road</title>
+<link rel="stylesheet" href="./css/style.css" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101820'/%3E%3Cpath d='M5 20h22l-2-6-4-3H11l-4 3z' fill='%23f2f4f7'/%3E%3Ccircle cx='10' cy='21' r='3.4' fill='%231b232c'/%3E%3Ccircle cx='22' cy='21' r='3.4' fill='%231b232c'/%3E%3C/svg%3E" />
+</head>
+<body>
+
+<!-- ───────────────────────── LOADING ───────────────────────── -->
+<div id="boot">
+  <div class="boot-inner">
+    <div class="boot-logo">
+      <span class="boot-logo-main">DUNE RUNNER</span>
+      <span class="boot-logo-sub">OPEN&nbsp;WORLD&nbsp;·&nbsp;OFF&nbsp;ROAD&nbsp;·&nbsp;FLIGHT</span>
+    </div>
+    <div class="boot-bar"><i id="bootFill"></i></div>
+    <div id="bootMsg" class="boot-msg">Warming up the engine…</div>
+    <button id="startBtn" class="start-btn" hidden>START ENGINE</button>
+    <div class="boot-tips" id="bootTips">
+      <div><b>W A S D</b> / arrows — drive &amp; steer</div>
+      <div><b>F</b> — toggle flight mode &nbsp;·&nbsp; <b>SPACE</b> — climb higher</div>
+      <div><b>SHIFT</b> — turbo &nbsp;·&nbsp; <b>C</b> — camera &nbsp;·&nbsp; <b>R</b> — recover</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────── CANVAS ───────────────────────── -->
+<canvas id="scene"></canvas>
+
+<!-- ───────────────────────── HUD ───────────────────────── -->
+<div id="hud" hidden>
+
+  <div class="hud-top-left">
+    <div class="badge">
+      <span class="badge-dot"></span>
+      <span id="biomeName">Coastline</span>
+    </div>
+    <div class="sub" id="coords">N 0 · E 0</div>
+  </div>
+
+  <div class="hud-top-right">
+    <div class="chip" id="clock">06:20</div>
+    <div class="chip" id="fps">60 fps</div>
+    <button class="chip icon" id="btnSound" title="Mute / unmute (M)" aria-label="Mute">
+      <svg viewBox="0 0 24 24" class="ico-on"><path d="M4 9v6h4l5 4V5L8 9H4zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zm-2.5-8v2.1a7 7 0 0 1 0 11.8V20a9 9 0 0 0 0-16z"/></svg>
+      <svg viewBox="0 0 24 24" class="ico-off"><path d="M4 9v6h4l5 4V5L8 9H4zm17 .4L19.6 8l-2.6 2.6L14.4 8 13 9.4l2.6 2.6L13 14.6 14.4 16l2.6-2.6L19.6 16 21 14.6 18.4 12 21 9.4z"/></svg>
+    </button>
+    <button class="chip icon" id="btnGfx" title="Graphics settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M19.1 12.9a7.5 7.5 0 0 0 0-1.8l2-1.5-2-3.4-2.3 1a7.4 7.4 0 0 0-1.6-.9L14.8 3H10.2l-.4 2.3c-.6.2-1.1.5-1.6.9l-2.3-1-2 3.4 2 1.5a7.5 7.5 0 0 0 0 1.8l-2 1.5 2 3.4 2.3-1c.5.4 1 .7 1.6.9l.4 2.3h4.6l.4-2.3c.6-.2 1.1-.5 1.6-.9l2.3 1 2-3.4-2-1.5zM12.5 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+    </button>
+    <div class="chip mode" id="modeChip">DRIVE</div>
+  </div>
+
+  <!-- settings -->
+  <div class="panel" id="gfxPanel" hidden>
+    <div class="panel-row">
+      <span class="panel-lbl">Graphics</span>
+      <div class="seg" id="gfxSeg"></div>
+    </div>
+    <div class="panel-row">
+      <span class="panel-lbl">Sound</span>
+      <div class="seg" id="sndSeg">
+        <button data-snd="on">On</button><button data-snd="off">Muted</button>
+      </div>
+    </div>
+    <div class="panel-row">
+      <span class="panel-lbl">Volume</span>
+      <input type="range" id="volRange" min="0" max="100" value="55" />
+    </div>
+    <div class="panel-note" id="gfxNote">Changing graphics reloads the world.</div>
+  </div>
+
+  <!-- Speed / altitude gauge -->
+  <div class="hud-gauge">
+    <!-- 240° arc, radius 76, centred at (100,100) -->
+    <svg viewBox="0 0 200 152" class="gauge-svg">
+      <path class="g-track" d="M34.2 138 A 76 76 0 1 1 165.8 138" />
+      <path class="g-fill" id="gaugeFill" d="M34.2 138 A 76 76 0 1 1 165.8 138" />
+    </svg>
+    <div class="gauge-read">
+      <div class="gauge-val" id="speedVal">0</div>
+      <div class="gauge-unit" id="speedUnit">km/h</div>
+    </div>
+    <div class="gauge-alt" id="altRead">ALT 0 m</div>
+    <div class="boost-wrap"><i id="boostFill"></i></div>
+  </div>
+
+  <!-- Minimap -->
+  <div class="hud-map">
+    <canvas id="minimap" width="176" height="176"></canvas>
+    <div class="map-ring"></div>
+  </div>
+
+  <div class="hud-hint" id="hint">Press <b>F</b> to fly · <b>SPACE</b> to climb</div>
+</div>
+
+<!-- ───────────────────────── TOUCH CONTROLS ───────────────────────── -->
+<div id="touch" hidden>
+
+  <!-- circular analogue thumbstick; the whole left area is live, and the
+       stick re-centres wherever your thumb lands -->
+  <div class="stick-zone" id="stickZone">
+    <div class="stick" id="stick">
+      <div class="stick-base">
+        <svg viewBox="0 0 200 200" class="stick-dial">
+          <circle cx="100" cy="100" r="94" class="sd-ring" />
+          <circle cx="100" cy="100" r="62" class="sd-inner" />
+          <path d="M100 22l9 14H91z"  class="sd-arrow" />
+          <path d="M100 178l-9-14h18z" class="sd-arrow" />
+          <path d="M22 100l14-9v18z"  class="sd-arrow" />
+          <path d="M178 100l-14 9v-18z" class="sd-arrow" />
+        </svg>
+      </div>
+      <div class="stick-knob" id="stickKnob"><i></i></div>
+    </div>
+  </div>
+
+  <!-- action cluster, laid out on a fixed grid so it never overlaps -->
+  <div class="act" id="act">
+    <div class="act-mini">
+      <button class="mb" data-btn="cam">CAM</button>
+      <button class="mb" data-btn="reset">RESET</button>
+      <button class="mb" data-btn="brake">DRIFT</button>
+    </div>
+    <button class="ab ab-turbo" data-btn="boost" aria-label="Turbo">
+      <span class="ab-ico">⚡</span><small>TURBO</small></button>
+    <button class="ab ab-climb" data-btn="lift" aria-label="Climb">
+      <span class="ab-ico">▲</span><small>CLIMB</small></button>
+    <button class="ab ab-fly"   data-btn="fly" aria-label="Toggle flight">
+      <span class="ab-ico">✈</span><small>FLY</small></button>
+  </div>
+</div>
+
+<div id="fatal" hidden>
+  <div class="fatal-box">
+    <h2>WebGL could not start</h2>
+    <p id="fatalMsg">Your browser or device blocked hardware 3D acceleration.</p>
+    <p class="small">Try Chrome, Edge, Firefox or Safari with hardware acceleration enabled.</p>
+  </div>
+</div>
+
+<script>
+  /* If the engine has not started in a few seconds, something stopped the
+     module from loading — almost always opening the page as a file:// URL,
+     which browsers block for ES modules. Say so rather than sitting on
+     "Warming up" forever. */
+  window.__bootStarted = false;
+  window.__bootFail = function (why) {
+    var el = document.getElementById('bootMsg');
+    if (el) el.innerHTML = why;
+  };
+  addEventListener('error', function (e) {
+    if (e.target && e.target.tagName === 'SCRIPT' && !window.__bootStarted) {
+      window.__bootFail('The game engine could not be loaded.<br>' +
+        (location.protocol === 'file:'
+          ? 'This page is open as a <b>file://</b> URL. Browsers block JavaScript modules there — serve it over http(s).'
+          : 'Check that the <b>src/</b> folder was uploaded next to index.html.'));
+    }
+  }, true);
+  setTimeout(function () {
+    if (!window.__bootStarted) {
+      window.__bootFail(location.protocol === 'file:'
+        ? 'Stuck because this page is open as a <b>file://</b> URL.<br>Browsers block JavaScript modules on file://. Serve it over http(s).'
+        : 'The game engine did not start. Check the browser console for details.');
+    }
+  }, 9000);
+</script>
+<script type="module" src="./src/main.js"></script>
+<script nomodule>
+  document.getElementById('bootMsg').textContent =
+    'This browser is too old to run the game. Please update to a recent Chrome, Edge, Firefox or Safari.';
+</script>
+</body>
+</html>

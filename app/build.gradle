@@ -1,0 +1,72 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'dev.dunerunner.game'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "dev.dunerunner.game"
+        minSdk 24                 // Android 7.0 — the oldest with a reliably
+        targetSdk 34              // updatable WebView that supports WebGL 2
+        versionCode 1
+        versionName "1.0"
+    }
+
+    /* Release signing. Create keystore.properties next to this module (it is
+       git-ignored) with storeFile / storePassword / keyAlias / keyPassword.
+       Generate the key yourself — see PLAY_STORE.md. If the file is absent the
+       release build still succeeds, it just comes out unsigned. */
+    signingConfigs {
+        release {
+            def propsFile = rootProject.file('keystore.properties')
+            if (propsFile.exists()) {
+                def props = new Properties()
+                propsFile.withInputStream { props.load(it) }
+                storeFile file(props['storeFile'])
+                storePassword props['storePassword']
+                keyAlias props['keyAlias']
+                keyPassword props['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+        }
+        release {
+            minifyEnabled false          // the game is HTML/JS in assets
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (rootProject.file('keystore.properties').exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // The game assets are already tiny; leaving them uncompressed makes
+    // the WebView load them without an inflate step.
+    androidResources {
+        noCompress 'js', 'html', 'css', 'webmanifest'
+    }
+
+    packagingOptions {
+        resources.excludes += ['META-INF/*']
+    }
+
+    bundle {
+        language { enableSplit = false }
+    }
+}
+
+dependencies {
+    // none — plain framework Activity + WebView, so the APK stays ~1.5 MB
+}

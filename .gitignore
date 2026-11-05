@@ -1,0 +1,26 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# signing — never commit these
+*.jks
+*.keystore
+keystore.properties
+
+# build output (module-level, not just the root /build)
+app/build/
+**/build/
+
+# local backups and scratch — not part of the project
+*.tar.gz
+_to_delete/
+
+# stale August copy of the web build; the live game is app/src/main/assets/game/
+dune-runner-web/

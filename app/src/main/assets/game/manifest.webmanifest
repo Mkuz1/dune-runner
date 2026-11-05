@@ -1,0 +1,19 @@
+{
+  "name": "Dune Runner — Open World Off-Road",
+  "short_name": "Dune Runner",
+  "description": "Drive and fly a white boxy 4x4 across an endless world of forest, desert dunes, beaches and open sea.",
+  "id": "/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#05080b",
+  "theme_color": "#0b1116",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
