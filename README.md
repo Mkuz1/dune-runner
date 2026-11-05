@@ -14,6 +14,26 @@ the Android APK, the iOS IPA and the web zip. Tag a commit `v1.1` (etc.) to
 make a permanent release. Add the Cloudflare secrets described at the top of
 the workflow and the website redeploys on every push too.
 
+**In-app updates:** each build of `main` is also published, signed, to the
+public repo [dune-runner-releases](https://github.com/mohamdbeam-star/dune-runner-releases)
+together with a `version.json`. Both apps read that file when they start
+(and when they come back to the front, at most every six hours):
+
+- **Android** shows *Update available*, downloads the APK with a progress bar
+  and hands it to the system installer. Updates install over the old copy
+  because CI signs every build with the same key (`dune-runner-release.jks`,
+  git-ignored — back it up; without it installed copies can't be updated).
+- **iPhone / iPad** can't install apps itself, so it offers *Install with
+  AltStore / SideStore* when either is installed, or downloads the `.ipa` and
+  opens the share sheet (Save to Files, AirDrop to the Mac running Sideloadly).
+
+Versions come from the workflow run number (`versionCode` = run + 10,
+`versionName` = 1.2.run). One-time setup of the CI secrets: `./set-ci-secrets.sh`.
+
+**Ground textures** are CC0 photogrammetry scans from
+[Poly Haven](https://polyhaven.com) in `app/src/main/assets/game/textures/`;
+the game falls back to its procedural textures if they are missing.
+
 ---
 
 # Dune Runner — Android app
@@ -136,8 +156,8 @@ The assets are a plain copy of the web build. After editing anything under
 ./sync-game-assets.sh /path/to/web/build    # or point it somewhere else
 ```
 
-Then rebuild. Bump `versionCode` and `versionName` in `app/build.gradle` for
-each release you ship.
+Then rebuild. CI sets `versionCode` / `versionName` for every published build;
+local builds default to 3 / 1.2 (see `app/build.gradle`).
 
 ---
 

@@ -12,6 +12,9 @@
 	<key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key><true/>
+	<!-- lets the updater offer one-tap install when AltStore / SideStore is present -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array><string>altstore</string><string>sidestore</string></array>
 	<key>ITSAppUsesNonExemptEncryption</key><false/>
 	<key>UILaunchScreen</key>
 	<dict>

@@ -368,6 +368,90 @@ function addWind(mat, clock, strength = 1, anchor = 0.7) {
   return mat;
 }
 
+/* -------------------------------------------------------- PHOTO DETAIL
+   The props are vertex-coloured shapes with no texture coordinates worth
+   using, so real surface detail is added triplanar in object space: it
+   sticks to each instance, needs no UVs, and works on merged geometry.
+
+     foliage material → pine-bark scan on anything brown (trunks,
+                        branches), leafy breakup from the grass scan on
+                        anything green (canopies, bushes, cactus)
+     static material  → rock scan on boulders and driftwood
+
+   The photo is divided by its own average colour, so it only modulates
+   the vertex colour around 1.0: the hand-tuned palette stays, it just
+   stops looking like painted plastic. */
+function addDetail(mat, textures, kind) {
+  const isLeafy = kind === 'foliage';
+  const tex = isLeafy ? textures.bark : textures.rock;
+  if (!(isLeafy ? textures.barkPhoto : textures.rockPhoto)) return mat;
+  const pm = textures.photoMean || {};
+  const one = new THREE.Vector3(1, 1, 1);
+  const prev = mat.onBeforeCompile;
+  const prevKey = mat.customProgramCacheKey;
+
+  mat.defines = { ...(mat.defines || {}), DETAIL_SCALE: isLeafy ? '0.55' : '0.32' };
+  if (isLeafy && textures.grassPhoto) mat.defines.DETAIL_LEAF = '';
+
+  mat.onBeforeCompile = (sh, renderer) => {
+    if (prev) prev.call(mat, sh, renderer);
+    sh.uniforms.tDetailA = { value: tex };
+    sh.uniforms.uMeanA = { value: (isLeafy ? pm.bark : pm.rock) || one };
+    sh.uniforms.tDetailB = { value: textures.grass };
+    sh.uniforms.uMeanB = { value: pm.grass || one };
+
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vDetP;
+        varying vec3 vDetN;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vDetP = position;
+        vDetN = normal;`);
+
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform sampler2D tDetailA, tDetailB;
+        uniform vec3 uMeanA, uMeanB;
+        varying vec3 vDetP;
+        varying vec3 vDetN;
+        // side projections stretched vertically: bark furrows and rock
+        // strata run along the length of the shape
+        vec3 tri( sampler2D t, vec3 p, vec3 w ){
+          return texture2D( t, p.zy * vec2( 1.0, 0.5 ) ).rgb * w.x +
+                 texture2D( t, p.xz ).rgb * w.y +
+                 texture2D( t, p.xy * vec2( 1.0, 0.5 ) ).rgb * w.z;
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 w = pow( abs( normalize( vDetN ) ), vec3( 4.0 ) );
+          w /= ( w.x + w.y + w.z );
+          vec3 p = vDetP * DETAIL_SCALE;
+          float leaf = 0.0;
+          #ifdef DETAIL_LEAF
+            leaf = smoothstep( -0.01, 0.05, diffuseColor.g - diffuseColor.r );
+          #endif
+          vec3 d = vec3( 1.0 );
+          if ( leaf < 0.999 ) {
+            d = clamp( tri( tDetailA, p, w ) / uMeanA, 0.0, 2.6 );
+            // keep 60 % of the photo's tint: full strength turns trunks orange
+            d = mix( vec3( dot( d, vec3( 0.2126, 0.7152, 0.0722 ) ) ), d, 0.6 );
+          }
+          #ifdef DETAIL_LEAF
+            if ( leaf > 0.001 ) {
+              // luminance only, with extra contrast, so leaves stay green
+              const vec3 Y = vec3( 0.2126, 0.7152, 0.0722 );
+              float l = dot( tri( tDetailB, p * 2.3, w ), Y ) / max( 1e-3, dot( uMeanB, Y ) );
+              l = clamp( 1.0 + ( l - 1.0 ) * 1.5, 0.25, 1.9 );
+              d = mix( d, vec3( l ), leaf );
+            }
+          #endif
+          diffuseColor.rgb *= d;
+        }`);
+  };
+  mat.customProgramCacheKey = () => (prevKey ? prevKey.call(mat) : '') + '_detail_' + kind;
+  return mat;
+}
+
 /* ---------------------------------------------------------------------- */
 export function buildPropLibrary(textures, quality) {
   const detail = quality && (quality.tier === 'ultra' || quality.tier === 'high') ? 1 : 0;
@@ -383,6 +467,12 @@ export function buildPropLibrary(textures, quality) {
     vertexColors: true, roughness: 0.87, metalness: 0.0,
     side: THREE.DoubleSide, flatShading: false
   }), clock, 1.4, 0.7);
+
+  // photo surface detail: six to nine extra texture reads, so not on low
+  if (!quality || quality.tier !== 'low') {
+    addDetail(mat, textures, 'static');
+    addDetail(foliageMat, textures, 'foliage');
+  }
 
   const tuftMat = addWind(new THREE.MeshStandardMaterial({
     map: textures.tuft, transparent: false, alphaTest: 0.30,

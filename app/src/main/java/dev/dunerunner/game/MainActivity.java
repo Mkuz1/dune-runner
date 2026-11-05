@@ -2,6 +2,7 @@ package dev.dunerunner.game;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
@@ -32,7 +33,7 @@ import java.util.Map;
  * Dune Runner — a full-screen WebView host.
  *
  * The whole game (HTML, JS, three.js) ships inside assets/game and runs
- * offline. No network permission, nothing downloaded at runtime.
+ * offline. The only network use is the update check (see Updater).
  *
  * Why the assets are served instead of loaded as file:// —
  *   Browsers refuse to load ES modules from a file:// URL: the origin is
@@ -57,6 +58,7 @@ public class MainActivity extends Activity {
             "https://" + ASSET_HOST + ASSET_PREFIX + "game/index.html";
 
     private WebView web;
+    private Updater updater;
 
     @SuppressLint({"SetJavaScriptEnabled"})
     @Override
@@ -132,6 +134,16 @@ public class MainActivity extends Activity {
         else web.loadUrl(GAME_URL);
 
         goImmersive();
+        updater = new Updater(this);
+    }
+
+    /** The package installer reports back here (launchMode is singleTask). */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent != null && Updater.ACTION_INSTALL_STATUS.equals(intent.getAction()) && updater != null) {
+            updater.onInstallStatus(intent);
+        }
     }
 
     /* ------------------------------------------------------------------
@@ -268,6 +280,7 @@ public class MainActivity extends Activity {
         super.onResume();
         if (web != null) { web.resumeTimers(); web.onResume(); }
         goImmersive();
+        if (updater != null) updater.onResume();
     }
 
     @Override

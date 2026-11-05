@@ -263,28 +263,131 @@ function bakeNeedles(size = 256) {
   return t;
 }
 
+/* ================= PHOTO-SCANNED GROUND ================= */
+/* The four terrain layers use real photogrammetry scans (Poly Haven, CC0)
+   from ./textures/: aerial captures 15–50 m across, so their physical
+   scale matches the 16–32 m tiles the terrain shader samples them at.
+
+   Each photo is calibrated against the procedural texture it replaces:
+   the shader multiplies it by a per-layer gain that matches the old
+   layer's average brightness exactly and most of its tint, so the
+   lighting, fog and grading tuned around the procedural palette still
+   hold. If an image fails to load, that layer quietly falls back to the
+   procedural bake. */
+
+const PHOTO_DIR = './textures/';
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.decoding = 'async';
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('could not load ' + url));
+    im.src = url;
+  });
+}
+
+const toLin = (v) => Math.pow(v / 255, 2.2);
+
+/** Average colour in linear space (the space the shader multiplies in). */
+function meanLinear(src) {
+  const n = 64;
+  const c = newCanvas(n);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, n, n);
+  const d = ctx.getImageData(0, 0, n, n).data;
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < d.length; i += 4) { r += toLin(d[i]); g += toLin(d[i + 1]); b += toLin(d[i + 2]); }
+  const k = 1 / (n * n);
+  return [r * k, g * k, b * k];
+}
+
+/** Per-channel gain that maps the photo's average onto the procedural one:
+    full luminance match, 60 % of the way on tint. */
+function calibrate(photoMean, targetMean) {
+  const L = (c) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
+  const gL = L(targetMean) / Math.max(1e-4, L(photoMean));
+  const g = [0, 1, 2].map(i => {
+    const full = targetMean[i] / Math.max(1e-4, photoMean[i]);
+    return clamp(lerp(gL, full, 0.6), 0.35, 3.0);
+  });
+  return new THREE.Vector3(g[0], g[1], g[2]);
+}
+
+function imageTexture(img, srgb, aniso, maxSize) {
+  let src = img;
+  if (img.width > maxSize) {
+    const c = newCanvas(maxSize);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, maxSize, maxSize);
+    src = c;
+  }
+  const t = new THREE.Texture(src);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = aniso;
+  t.generateMipmaps = true;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
+}
+
 /* ================= PUBLIC BUILDER ================= */
 
 export async function buildTextures(quality, onProgress = () => {}) {
-  const size = quality.texSize;         // 512 high / 384 med / 256 low
+  const size = quality.texSize;         // 1024 ultra … 320 low
   const aniso = quality.aniso;
-  const out = {};
+  const photoMax = quality.tier === 'low' ? 512 : 1024;
+  const out = { gain: {}, photoMean: {}, antiTile: quality.tier !== 'low' };
   const steps = [
-    ['sand',  bakeSand,  6, 2.4],
-    ['grass', bakeGrass, 6, 1.9],
-    ['rock',  bakeRock,  4, 3.2],
-    ['dirt',  bakeDirt,  4, 2.0],
-    ['bark',  bakeBark,  3, 2.6]
+    ['sand',  bakeSand,  2.4, true],
+    ['grass', bakeGrass, 1.9, true],
+    ['rock',  bakeRock,  3.2, true],
+    ['dirt',  bakeDirt,  2.0, true],
+    ['bark',  bakeBark,  2.6, true]
   ];
 
+  // start every download at once; they decode while the bakes below run
+  const photos = {};
+  for (const [name, , , photo] of steps) {
+    if (!photo) continue;
+    photos[name] = Promise.all([
+      loadImage(PHOTO_DIR + name + '.jpg'),
+      loadImage(PHOTO_DIR + name + '_n.jpg')
+    ]).catch((e) => { console.warn('[textures]', e.message, '— using the procedural layer'); return null; });
+  }
+
   for (let i = 0; i < steps.length; i++) {
-    const [name, fn, rep, strength] = steps[i];
-    const res = fn(size);
-    out[name] = toTexture(res.canvas, 1, true, aniso);
-    out[name + 'N'] = toTexture(normalFromHeight(res.height, size, strength), 1, false, aniso);
-    onProgress((i + 1) / (steps.length + 1), `Baking ${name}…`);
+    const [name, fn, strength, photo] = steps[i];
+    const pair = photo ? await photos[name] : null;
+    if (pair) {
+      const [col, nrm] = pair;
+      // a small bake is enough to know the colour the world was tuned for
+      const target = meanLinear(fn(64).canvas);
+      const mean = meanLinear(col);
+      out.gain[name] = calibrate(mean, target);
+      out.photoMean[name] = new THREE.Vector3(mean[0], mean[1], mean[2]);
+      out[name] = imageTexture(col, true, aniso, photoMax);
+      out[name + 'N'] = imageTexture(nrm, false, aniso, photoMax);
+      out[name + 'Photo'] = true;
+    } else {
+      const res = fn(size);
+      out[name] = toTexture(res.canvas, 1, true, aniso);
+      out[name + 'N'] = toTexture(normalFromHeight(res.height, size, strength), 1, false, aniso);
+      out.gain[name] = new THREE.Vector3(1, 1, 1);
+    }
+    onProgress((i + 1) / (steps.length + 1), `Preparing ${name}…`);
     await new Promise(r => setTimeout(r, 0));   // keep the loader animating
   }
+
+  /* Large-scale brightness variation. It used to be read from the
+     procedural rock texture; the rock layer is a photo now, so the
+     same bake is kept, small, purely as a macro-noise source. */
+  out.macro = toTexture(bakeRock(256).canvas, 1, true, 1);   // sRGB, as before
 
   out.tuft = bakeTuft(quality.tier === 'low' ? 128 : 224);
   out.needles = bakeNeedles(quality.tier === 'low' ? 160 : 256);

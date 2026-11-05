@@ -36,9 +36,21 @@ final class GameViewController: UIViewController {
         view = webView
     }
 
+    private lazy var updater = Updater(host: self)
+
     override func viewDidLoad() {
         super.viewDidLoad()
         webView.load(URLRequest(url: URL(string: "\(BundleSchemeHandler.scheme)://game/index.html")!))
+        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification,
+                                               object: nil, queue: .main) { [weak self] _ in
+            self?.updater.checkIfDue()
+        }
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // let the game finish booting before asking anything
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in self?.updater.checkIfDue() }
     }
 
     // Edge-to-edge and out of the way: the thumbstick and buttons live right

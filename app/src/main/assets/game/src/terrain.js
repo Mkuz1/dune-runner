@@ -30,13 +30,24 @@ function makeTerrainMaterial(tex) {
     normalScale: new THREE.Vector2(1.15, 1.15)
   });
 
+  const one = new THREE.Vector3(1, 1, 1);
+  const gain = tex.gain || {};
   const U = {
     tGrass: { value: tex.grass }, tSand: { value: tex.sand },
     tRock: { value: tex.rock },   tDirt: { value: tex.dirt },
     nGrass: { value: tex.grassN }, nSand: { value: tex.sandN },
-    nRock: { value: tex.rockN },   nDirt: { value: tex.dirtN }
+    nRock: { value: tex.rockN },   nDirt: { value: tex.dirtN },
+    tMacro: { value: tex.macro || tex.rock },
+    // colour calibration for the photo-scanned layers (1,1,1 if procedural)
+    gGrass: { value: gain.grass || one }, gSand: { value: gain.sand || one },
+    gRock:  { value: gain.rock  || one }, gDirt: { value: gain.dirt || one }
   };
   mat.userData.U = U;
+  /* Photo textures repeat visibly from the air. ANTI_TILE blends in a
+     second, rotated sample at an unrelated scale, switched by macro noise,
+     so the combined pattern practically never repeats. Four extra texture
+     reads, so the low tier goes without. */
+  if (tex.antiTile) mat.defines = { ANTI_TILE: '' };
 
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
@@ -62,7 +73,20 @@ function makeTerrainMaterial(tex) {
         varying float vNrmY;
         varying float vAO;
         uniform sampler2D tGrass, tSand, tRock, tDirt;
-        uniform sampler2D nGrass, nSand, nRock, nDirt;`)
+        uniform sampler2D nGrass, nSand, nRock, nDirt;
+        uniform sampler2D tMacro;
+        uniform vec3 gGrass, gSand, gRock, gDirt;
+
+        vec3 layer( sampler2D t, vec2 uv, float w ){
+          vec3 a = texture2D( t, uv ).rgb;
+          #ifdef ANTI_TILE
+            if ( w > 0.004 ) {
+              vec3 b = texture2D( t, vec2( uv.y, -uv.x ) * 0.381 + 0.27 ).rgb;
+              a = mix( a, b, w );
+            }
+          #endif
+          return a;
+        }`)
 
       .replace('#include <map_fragment>', `
         vec2 uvA = vNormalMapUv;            // 16 m tile
@@ -72,25 +96,31 @@ function makeTerrainMaterial(tex) {
         vec2 uvM = vNormalMapUv * 0.125;    // 128 m macro
         vec4 sp  = vSplat;
 
+        // which of the two anti-tiling samples shows, in ~40 m patches
+        float tileW = 0.0;
+        #ifdef ANTI_TILE
+          tileW = smoothstep( 0.42, 0.62, texture2D( tMacro, uvM * 3.1 + 0.5 ).r );
+        #endif
+
         vec3 terra =
-            texture2D( tGrass, uvA ).rgb * sp.r +
-            texture2D( tSand,  uvB ).rgb * sp.g +
-            texture2D( tRock,  uvC ).rgb * sp.b +
-            texture2D( tDirt,  uvA ).rgb * sp.a;
+            layer( tGrass, uvA, tileW ) * gGrass * sp.r +
+            layer( tSand,  uvA, tileW ) * gSand  * sp.g +
+            layer( tRock,  uvC, tileW ) * gRock  * sp.b +
+            layer( tDirt,  uvA, tileW ) * gDirt  * sp.a;
 
         // a second, much finer layer that only shows up close, so the
         // ground keeps texture right under the wheels
         float near = 1.0 - smoothstep( 8.0, 46.0, length( vViewPosition ) );
         if ( near > 0.001 ) {
           vec3 fine =
-              texture2D( tGrass, uvD ).rgb * sp.r +
-              texture2D( tSand,  uvD ).rgb * sp.g +
-              texture2D( tRock,  uvD ).rgb * sp.b +
-              texture2D( tDirt,  uvD ).rgb * sp.a;
+              texture2D( tGrass, uvD ).rgb * gGrass * sp.r +
+              texture2D( tSand,  uvD ).rgb * gSand  * sp.g +
+              texture2D( tRock,  uvD ).rgb * gRock  * sp.b +
+              texture2D( tDirt,  uvD ).rgb * gDirt  * sp.a;
           terra = mix( terra, terra * ( 0.45 + 1.15 * fine ), near * 0.55 );
         }
 
-        float macro = texture2D( tRock, uvM ).g;
+        float macro = texture2D( tMacro, uvM ).g;
         terra *= 0.76 + 0.48 * macro;
 
         // ambient occlusion baked from the terrain's own curvature
@@ -116,7 +146,7 @@ function makeTerrainMaterial(tex) {
       .replace('#include <normal_fragment_maps>', `
         vec3 mapN = normalize(
             ( texture2D( nGrass, uvA ).xyz * 2.0 - 1.0 ) * sp.r +
-            ( texture2D( nSand,  uvB ).xyz * 2.0 - 1.0 ) * sp.g +
+            ( texture2D( nSand,  uvA ).xyz * 2.0 - 1.0 ) * sp.g +
             ( texture2D( nRock,  uvC ).xyz * 2.0 - 1.0 ) * sp.b +
             ( texture2D( nDirt,  uvA ).xyz * 2.0 - 1.0 ) * sp.a );
         // a finer normal layer up close, fading out before it can shimmer

@@ -8,8 +8,15 @@
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
 #   ANDROID_KEY_PASSWORD     -> signed release APK + AAB for Google Play
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID -> deploy the website
+#   RELEASES_DEPLOY_KEY      -> SSH key with write access to the public repo
+#                               mohamdbeam-star/dune-runner-releases; pushes
+#                               to main publish the signed APK + IPA there with
+#                               the version.json the in-app updater reads
 # Optional repository variable:
 #   CF_PAGES_PROJECT         -> Cloudflare Pages project name (default: fjmk)
+#
+# Versions: versionCode / CFBundleVersion = run number + 10, versionName =
+# 1.2.<run number>, so every build is newer than the one before it.
 # Without them everything still builds; the release APK is just unsigned and
 # the website step is skipped.
 
@@ -55,7 +62,9 @@ jobs:
       - name: Build
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug assembleRelease bundleRelease
+          ./gradlew --no-daemon \
+            -PversionCode=$((GITHUB_RUN_NUMBER + 10)) -PversionName="1.2.$GITHUB_RUN_NUMBER" \
+            assembleDebug assembleRelease bundleRelease
       - name: Collect
         run: |
           mkdir -p out
@@ -83,6 +92,7 @@ jobs:
             -configuration Release -sdk iphoneos \
             SYMROOT="$PWD/build" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=$((GITHUB_RUN_NUMBER + 10)) MARKETING_VERSION="1.2.$GITHUB_RUN_NUMBER" \
             build
       - name: Package .ipa
         run: |
@@ -114,6 +124,67 @@ jobs:
         with:
           name: web
           path: DuneRunner-web.zip
+
+  # The in-app updater's source: a public repo holding only the latest build.
+  # Each run replaces its single commit, so the repo never grows.
+  publish-updates:
+    needs: [android, ios]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_KEY: ${{ secrets.RELEASES_DEPLOY_KEY }}
+      NOTES: ${{ github.event.head_commit.message }}
+    steps:
+      - uses: actions/download-artifact@v4
+        if: env.DEPLOY_KEY != ''
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish to dune-runner-releases
+        if: env.DEPLOY_KEY != ''
+        run: |
+          if [ ! -f dist/DuneRunner-release.apk ]; then
+            echo "::warning::No signed release APK (keystore secrets missing) — not publishing an update."
+            exit 0
+          fi
+          mkdir site
+          cp dist/DuneRunner-release.apk site/DuneRunner.apk
+          cp dist/DuneRunner-unsigned.ipa site/DuneRunner.ipa
+          python3 - <<'PY'
+          import json, os, datetime
+          run = int(os.environ['GITHUB_RUN_NUMBER'])
+          base = 'https://raw.githubusercontent.com/mohamdbeam-star/dune-runner-releases/main/'
+          notes = (os.environ.get('NOTES') or '').strip().splitlines()
+          v = {
+            'versionCode': run + 10,
+            'versionName': f'1.2.{run}',
+            'sha': os.environ['GITHUB_SHA'][:7],
+            'date': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'notes': notes[0][:200] if notes else '',
+            'apk': base + 'DuneRunner.apk', 'apkSize': os.path.getsize('site/DuneRunner.apk'),
+            'ipa': base + 'DuneRunner.ipa', 'ipaSize': os.path.getsize('site/DuneRunner.ipa'),
+          }
+          json.dump(v, open('site/version.json', 'w'), indent=2)
+          open('site/README.md', 'w').write(f"""# Dune Runner — latest build
+
+          **Version {v['versionName']}** (build {v['versionCode']}, {v['date'][:10]})
+
+          - [DuneRunner.apk]({v['apk']}) — Android. Installed copies update themselves from inside the app.
+          - [DuneRunner.ipa]({v['ipa']}) — iPhone / iPad, unsigned: install with AltStore, SideStore or Sideloadly.
+
+          `version.json` is what the apps read to find out an update exists.
+          """)
+          PY
+          cat site/version.json
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+          cd site
+          git init -q -b main
+          git -c user.name="dune-runner CI" -c user.email="ci@users.noreply.github.com" add -A
+          git -c user.name="dune-runner CI" -c user.email="ci@users.noreply.github.com" commit -q -m "Build 1.2.$GITHUB_RUN_NUMBER (${GITHUB_SHA::7})"
+          git push -f git@github.com:mohamdbeam-star/dune-runner-releases.git main
 
   release:
     needs: [android, ios, web]

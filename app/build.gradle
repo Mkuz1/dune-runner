@@ -10,8 +10,11 @@ android {
         applicationId "dev.dunerunner.game"
         minSdk 24                 // Android 7.0 — the oldest with a reliably
         targetSdk 34              // updatable WebView that supports WebGL 2
-        versionCode 2
-        versionName "1.1"
+        // CI passes -PversionCode / -PversionName (from the run number) so
+        // every published build is newer than the last; the in-app updater
+        // compares versionCode. Local builds default to 3 / 1.2.
+        versionCode((project.findProperty('versionCode') ?: '3').toString().toInteger())
+        versionName((project.findProperty('versionName') ?: '1.2').toString())
     }
 
     /* Release signing. Create keystore.properties next to this module (it is
