@@ -17,7 +17,7 @@ final class GameViewController: UIViewController {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(BundleSchemeHandler(), forURLScheme: BundleSchemeHandler.scheme)
         config.allowsInlineMediaPlayback = true
-        config.mediaTypesPlaybackRequiringUserAction = []     // engine audio starts on first tap
+        config.mediaTypesRequiringUserActionForPlayback = []  // engine audio starts on first tap
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
 
         webView = WKWebView(frame: .zero, configuration: config)

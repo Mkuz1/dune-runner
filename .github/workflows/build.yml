@@ -40,6 +40,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'   # the default also asks for 'tools', which no longer exists
       - name: Release signing (only if the keystore secrets exist)
         if: env.KS_B64 != ''
         run: |
