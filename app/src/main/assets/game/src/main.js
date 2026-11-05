@@ -102,7 +102,7 @@ class Game {
     this.terrain = new Terrain(this.scene, this.textures, this.q, this.props);
     this.ocean = new Ocean(this.scene, this.q, this.hf);
     this.grass = new GrassField(this.scene, this.props, this.terrain, this.q);
-    this.villageLib = buildVillageLibrary();
+    this.villageLib = buildVillageLibrary(this.textures);
     this.villages = new Villages(this.scene, this.q, this.villageLib);
 
     setProgress(0.66, 'Prepping the truck…');

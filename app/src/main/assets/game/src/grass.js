@@ -84,6 +84,7 @@ export class GrassField {
         if (green < 0.30 && sand < 0.55) continue;
         if (_S.trail > 0.3) continue;
         if (sand > green && r3 > 0.15) continue;
+        if (h < 9 && sand > green) continue;          // bare sand on the beaches
         const vg = villageAt(x, z);
         if (vg && r3 < vg.w * 0.75) continue;      // mown around the houses        // only the odd tuft in the sand
 

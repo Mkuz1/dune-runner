@@ -56,6 +56,25 @@ function duneAt(x, z) {
 }
 
 /* --- off-road trail network ---------------------------------------- */
+/** Signed distance to the nearest trail centreline (in the warped space the
+    network is laid out in). The sign says which side of the road a point is
+    on; the renderer uses it to lay the road surface, ruts and verges out
+    across the road, and its gradient to find the road's direction. */
+export function trailSigned(x, z) {
+  const wx = x + fbm(x * 0.00037 + 11.3, z * 0.00088, 3) * 340;
+  const wz = z + fbm(x * 0.00088 - 31.7, z * 0.00037 + 7.1, 3) * 340;
+  const m = (v, sp) => { const r = v % sp; return r < 0 ? r + sp : r; };
+  const s1 = m(wx, TRAIL_SPACING_A) - TRAIL_SPACING_A * 0.5;
+  const s2 = m(wz, TRAIL_SPACING_B) - TRAIL_SPACING_B * 0.5;
+  const s3 = m(wx * 0.7071 + wz * 0.7071, TRAIL_SPACING_C) - TRAIL_SPACING_C * 0.5;
+  const s4 = m(wx * 0.7071 - wz * 0.7071, TRAIL_SPACING_C) - TRAIL_SPACING_C * 0.5;
+  let best = s1;
+  if (Math.abs(s2) < Math.abs(best)) best = s2;
+  if (Math.abs(s3) < Math.abs(best)) best = s3;
+  if (Math.abs(s4) < Math.abs(best)) best = s4;
+  return best;
+}
+
 function trailDistance(x, z) {
   const wx = x + fbm(x * 0.00037 + 11.3, z * 0.00088, 3) * 340;
   const wz = z + fbm(x * 0.00088 - 31.7, z * 0.00037 + 7.1, 3) * 340;
@@ -223,8 +242,10 @@ export function surface(x, z, detail = true, out = S) {
 
   // carve the trail network into the surface
   let trail = 0;
+  out.trailD = 1e3;
   if (land > 0.02 && base > 1.5) {
     const d = trailDistance(x, z);
+    out.trailD = d;
     trail = smoothstep(17, 5.5, d) * land * smoothstep(1.5, 9, base);
     if (trail > 0.001) elev = lerp(elev, big, trail * 0.88);
   }
@@ -278,7 +299,13 @@ export function splat(s, slopeY, out = [0, 0, 0, 0]) {
   const beach = h < 0 ? 1 : smoothstep(9.0, 1.0, h);
   const sand = clamp(Math.max(beach, s.desert * (1 - rock * 0.7)), 0, 1);
   const grass = clamp((1 - s.desert) * (1 - rock) * (1 - beach), 0, 1);
-  const dirt = clamp(s.trail * (1 - rock * 0.5), 0, 1);
+  /* The flattened trail corridor is ~11 m wide, but a real dirt road is
+     about 6 m: the surface is drawn only within ~3 m of the centreline and
+     the rest of the corridor is verge (grass or sand). Capped just under 1
+     so every vertex keeps a trace of what the ground would be without the
+     road, which the shader needs when it ruffles the road's edge. */
+  const narrow = s.trailD === undefined ? 1 : smoothstep(5.2, 3.0, s.trailD);
+  const dirt = clamp(s.trail * narrow * (1 - rock * 0.5), 0, 0.97);
 
   let r = grass * (1 - dirt);
   let g = sand * (1 - dirt * 0.85);

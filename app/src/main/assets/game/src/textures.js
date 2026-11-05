@@ -306,12 +306,12 @@ function meanLinear(src) {
 
 /** Per-channel gain that maps the photo's average onto the procedural one:
     full luminance match, 60 % of the way on tint. */
-function calibrate(photoMean, targetMean) {
+function calibrate(photoMean, targetMean, tint = 0.6) {
   const L = (c) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
   const gL = L(targetMean) / Math.max(1e-4, L(photoMean));
   const g = [0, 1, 2].map(i => {
     const full = targetMean[i] / Math.max(1e-4, photoMean[i]);
-    return clamp(lerp(gL, full, 0.6), 0.35, 3.0);
+    return clamp(lerp(gL, full, tint), 0.35, 3.0);
   });
   return new THREE.Vector3(g[0], g[1], g[2]);
 }
@@ -432,6 +432,32 @@ export async function buildTextures(quality, onProgress = () => {}) {
      procedural rock texture; the rock layer is a photo now, so the
      same bake is kept, small, purely as a macro-noise source. */
   out.macro = toTexture(bakeRock(256).canvas, 1, true, 1);   // sRGB, as before
+
+  /* More photo surfaces: the road (gravel-road scan) and beach (coastal sand
+     scan) are calibrated against the procedural layer they stand in for;
+     chalet logs, roof shingles and foundation stone only record their mean
+     colour, because the village shader uses them to modulate its own
+     palette. Any that fail to load are simply left out. */
+  const extra = [
+    // [name, has normal map, procedural target, how much of the target's tint to take]
+    ['road', true, bakeDirt, 0.1], ['beach', true, bakeSand, 0.5],
+    ['logs', false, null, 0], ['roof', false, null, 0], ['stone', false, null, 0]
+  ];
+  await Promise.all(extra.map(async ([name, withNormal, target, tint]) => {
+    try {
+      const [col, nrm] = await Promise.all([
+        loadImage(PHOTO_DIR + name + '.jpg'),
+        withNormal ? loadImage(PHOTO_DIR + name + '_n.jpg') : Promise.resolve(null)
+      ]);
+      const mean = meanLinear(col);
+      out.photoMean[name] = new THREE.Vector3(mean[0], mean[1], mean[2]);
+      out.gain[name] = target ? calibrate(mean, meanLinear(target(64).canvas), tint) : new THREE.Vector3(1, 1, 1);
+      out[name] = imageTexture(col, true, aniso, photoMax);
+      if (nrm) out[name + 'N'] = imageTexture(nrm, false, aniso, photoMax);
+    } catch (e) {
+      console.warn('[textures]', e.message);
+    }
+  }));
 
   // photo foliage for the card trees (the low tier keeps the solid ones)
   if (quality.tier !== 'low') {

@@ -30,9 +30,13 @@ together with a `version.json`. Both apps read that file when they start
 Versions come from the workflow run number (`versionCode` = run + 10,
 `versionName` = 1.2.run). One-time setup of the CI secrets: `./set-ci-secrets.sh`.
 
-**Ground textures** and the **tree foliage** (scanned pine twigs and leaf
-sprigs, used on the photo-card trees in `src/trees.js`) are CC0 assets from
-[Poly Haven](https://polyhaven.com) in `app/src/main/assets/game/textures/`.
+**Ground textures**, the **road** (gravel-road scan laid out along each
+track with wheel ruts and ragged verges), **beach sand**, the **chalets'** log
+walls, shingle roofs and stone plinths, and the **tree foliage** (scanned pine
+twigs and leaf sprigs, used on the photo-card trees in `src/trees.js`) are
+CC0 assets from [Poly Haven](https://polyhaven.com) in
+`app/src/main/assets/game/textures/`. The sea's ripple normal map is generated
+at load from a wind-wave spectrum (`src/ocean.js`).
 If they are missing the game falls back to its procedural textures and solid
 trees; the Low quality preset always uses the solid trees.
 

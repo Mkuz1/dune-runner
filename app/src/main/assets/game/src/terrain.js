@@ -12,7 +12,7 @@
 ------------------------------------------------------------------ */
 
 import * as THREE from '../libs/three/three.module.js';
-import { surface, splat, villageAt, SEA_LEVEL } from './world.js';
+import { surface, splat, villageAt, trailSigned, SEA_LEVEL } from './world.js';
 import { hash2, clamp, smoothstep } from './noise.js';
 
 export const CHUNK = 512;
@@ -34,20 +34,25 @@ function makeTerrainMaterial(tex) {
   const gain = tex.gain || {};
   const U = {
     tGrass: { value: tex.grass }, tSand: { value: tex.sand },
-    tRock: { value: tex.rock },   tDirt: { value: tex.dirt },
+    tRock: { value: tex.rock },   tDirt: { value: tex.road || tex.dirt },
     nGrass: { value: tex.grassN }, nSand: { value: tex.sandN },
-    nRock: { value: tex.rockN },   nDirt: { value: tex.dirtN },
+    nRock: { value: tex.rockN },   nDirt: { value: tex.roadN || tex.dirtN },
     tMacro: { value: tex.macro || tex.rock },
+    // the 4th layer is the road: a gravel-road scan when it loaded
+    tBeach: { value: tex.beach || tex.sand }, nBeach: { value: tex.beachN || tex.sandN },
+    gBeach: { value: gain.beach || one },
     // colour calibration for the photo-scanned layers (1,1,1 if procedural)
     gGrass: { value: gain.grass || one }, gSand: { value: gain.sand || one },
-    gRock:  { value: gain.rock  || one }, gDirt: { value: gain.dirt || one }
+    gRock:  { value: gain.rock  || one }, gDirt: { value: (tex.road ? gain.road : gain.dirt) || one }
   };
   mat.userData.U = U;
   /* Photo textures repeat visibly from the air. ANTI_TILE blends in a
      second, rotated sample at an unrelated scale, switched by macro noise,
      so the combined pattern practically never repeats. Four extra texture
      reads, so the low tier goes without. */
-  if (tex.antiTile) mat.defines = { ANTI_TILE: '' };
+  mat.defines = {};
+  if (tex.antiTile) mat.defines.ANTI_TILE = '';
+  if (tex.beach) mat.defines.HAS_BEACH = '';
 
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
@@ -56,12 +61,15 @@ function makeTerrainMaterial(tex) {
       .replace('#include <common>', `#include <common>
         attribute vec4 aSplat;
         attribute float aAO;
+        attribute vec3 aRoad;
+        varying vec3 vRoad;
         varying vec4 vSplat;
         varying vec3 vWPos;
         varying float vNrmY;
         varying float vAO;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vSplat = aSplat;
+        vRoad  = aRoad;
         vAO    = aAO;
         vWPos  = ( modelMatrix * vec4( position, 1.0 ) ).xyz;
         vNrmY  = normalize( mat3( modelMatrix ) * normal ).y;`);
@@ -74,8 +82,9 @@ function makeTerrainMaterial(tex) {
         varying float vAO;
         uniform sampler2D tGrass, tSand, tRock, tDirt;
         uniform sampler2D nGrass, nSand, nRock, nDirt;
-        uniform sampler2D tMacro;
-        uniform vec3 gGrass, gSand, gRock, gDirt;
+        uniform sampler2D tMacro, tBeach, nBeach;
+        uniform vec3 gGrass, gSand, gRock, gDirt, gBeach;
+        varying vec3 vRoad;
 
         vec3 layer( sampler2D t, vec2 uv, float w ){
           vec3 a = texture2D( t, uv ).rgb;
@@ -102,11 +111,47 @@ function makeTerrainMaterial(tex) {
           tileW = smoothstep( 0.42, 0.62, texture2D( tMacro, uvM * 3.1 + 0.5 ).r );
         #endif
 
+        /* ---- road: laid out in its own frame ----
+           vRoad.x is the signed distance across the road, vRoad.yz its
+           direction, so the gravel, the wheel ruts and the grass hump all
+           run along the road, and the edge can be ragged instead of a
+           smooth blur. */
+        float across = vRoad.x;
+        float ad = abs( across );
+        vec2 uvR = vec2( across, dot( vWPos.xz, normalize( vRoad.yz + 1e-5 ) ) ) * 0.5;   // 2 m gravel scan
+        float rutW = 0.0, humpW = 0.0;
+        if ( sp.a > 0.002 ) {
+          float en = texture2D( tMacro, vWPos.xz * 0.09 ).g + texture2D( tMacro, vWPos.xz * 0.37 ).g * 0.5;
+          float edge = 1.0 - smoothstep( 1.9 + en * 1.5, 2.4 + en * 2.1, ad );
+          float a2 = min( sp.a, edge );
+          // hand the weight the ragged edge removed back to the ground around it
+          sp.rgb *= ( 1.0 - a2 ) / max( 1.0 - sp.a, 1e-3 );
+          sp.a = a2;
+          rutW  = smoothstep( 0.40, 0.10, abs( ad - 0.95 ) );       // two tyre tracks, 1.9 m apart
+          humpW = smoothstep( 0.45, 0.12, ad ) * smoothstep( 0.30, 0.62, en * 0.75 );
+        }
+
+        vec3 roadC = texture2D( tDirt, uvR ).rgb * gDirt;
+        roadC *= mix( 1.0, 0.74, rutW );                               // packed down, darker
+        // worn and dusty patches along the way
+        roadC *= 0.8 + 0.4 * texture2D( tMacro, vWPos.xz * 0.045 + 0.3 ).g;
+        // the scan is quite red; real gravel tracks are a dusty grey-brown
+        roadC = mix( vec3( dot( roadC, vec3( 0.2126, 0.7152, 0.0722 ) ) ), roadC, 0.5 ) * vec3( 1.0, 0.97, 0.92 );
+        roadC = mix( roadC, texture2D( tGrass, uvR * 0.3 ).rgb * gGrass, humpW * 0.6 );
+
+        /* ---- beach: real coastal sand on the shoreline band ---- */
+        float beachW = 0.0;
+        vec3 sandC = layer( tSand, uvA, tileW ) * gSand;
+        #ifdef HAS_BEACH
+          beachW = 1.0 - smoothstep( 3.5, 8.5, vWPos.y );
+          if ( beachW > 0.001 ) sandC = mix( sandC, texture2D( tBeach, uvA * 1.07 ).rgb * gBeach, beachW );
+        #endif
+
         vec3 terra =
             layer( tGrass, uvA, tileW ) * gGrass * sp.r +
-            layer( tSand,  uvA, tileW ) * gSand  * sp.g +
+            sandC * sp.g +
             layer( tRock,  uvC, tileW ) * gRock  * sp.b +
-            layer( tDirt,  uvA, tileW ) * gDirt  * sp.a;
+            roadC * sp.a;
 
         // a second, much finer layer that only shows up close, so the
         // ground keeps texture right under the wheels
@@ -116,7 +161,7 @@ function makeTerrainMaterial(tex) {
               texture2D( tGrass, uvD ).rgb * gGrass * sp.r +
               texture2D( tSand,  uvD ).rgb * gSand  * sp.g +
               texture2D( tRock,  uvD ).rgb * gRock  * sp.b +
-              texture2D( tDirt,  uvD ).rgb * gDirt  * sp.a;
+              texture2D( tDirt,  uvR * 4.0 ).rgb * gDirt  * sp.a;
           terra = mix( terra, terra * ( 0.45 + 1.15 * fine ), near * 0.55 );
         }
 
@@ -139,22 +184,22 @@ function makeTerrainMaterial(tex) {
       .replace('#include <roughnessmap_fragment>', `
         float roughnessFactor = 1.0;
         roughnessFactor = mix( roughnessFactor, 0.84, sp.b );
-        roughnessFactor = mix( roughnessFactor, 0.94, sp.a );
+        roughnessFactor = mix( roughnessFactor, mix( 0.94, 0.82, rutW ), sp.a );
         roughnessFactor *= ( 1.0 - wetF * 0.55 );
         roughnessFactor = mix( roughnessFactor, 0.42, snow );`)
 
       .replace('#include <normal_fragment_maps>', `
         vec3 mapN = normalize(
             ( texture2D( nGrass, uvA ).xyz * 2.0 - 1.0 ) * sp.r +
-            ( texture2D( nSand,  uvA ).xyz * 2.0 - 1.0 ) * sp.g +
+            mix( texture2D( nSand, uvA ).xyz, texture2D( nBeach, uvA * 1.07 ).xyz, beachW * 0.85 ) * 2.0 * sp.g - sp.g +
             ( texture2D( nRock,  uvC ).xyz * 2.0 - 1.0 ) * sp.b +
-            ( texture2D( nDirt,  uvA ).xyz * 2.0 - 1.0 ) * sp.a );
+            ( texture2D( nDirt,  uvR ).xyz * 2.0 - 1.0 ) * sp.a );
         // a finer normal layer up close, fading out before it can shimmer
         vec3 fineN = normalize(
             ( texture2D( nGrass, uvD ).xyz * 2.0 - 1.0 ) * sp.r +
             ( texture2D( nSand,  uvD ).xyz * 2.0 - 1.0 ) * sp.g +
             ( texture2D( nRock,  uvD ).xyz * 2.0 - 1.0 ) * sp.b +
-            ( texture2D( nDirt,  uvD ).xyz * 2.0 - 1.0 ) * sp.a );
+            ( texture2D( nDirt,  uvR * 4.0 ).xyz * 2.0 - 1.0 ) * sp.a );
         mapN = normalize( mapN + fineN * near * 0.8 );
         float nFade = 1.0 - smoothstep( 70.0, 420.0, length( vViewPosition ) );
         mapN.xy *= normalScale * nFade;
@@ -180,23 +225,37 @@ class ChunkJob {
     this.hs = new Float32Array(this.E * this.E);
     this.ds = new Float32Array(this.E * this.E);
     this.ts = new Float32Array(this.E * this.E);
+    this.rd = new Float32Array(this.E * this.E);      // distance to the road centreline
+    this.rs = new Float32Array(this.E * this.E);      // signed, for the road's own frame
+    this.rgx = new Float32Array(this.E * this.E);     // its gradient → road direction
+    this.rgz = new Float32Array(this.E * this.E);
     this.row = 0;
     this.phase = 0;
     this.minY = 1e9; this.maxY = -1e9;
   }
 
   step(deadline) {
-    const { E, d, ox, oz, hs, ds, ts } = this;
+    const { E, d, ox, oz, hs, ds, ts, rd, rs, rgx, rgz } = this;
     if (this.phase === 0) {
       const S = { h: 0, desert: 0, land: 0, trail: 0, base: 0 };
       while (this.row < E) {
         const wz = oz + this.row * d;
         const b = this.row * E;
         for (let c = 0; c < E; c++) {
-          surface(ox + c * d, wz, this.N >= 48, S);
+          const wx = ox + c * d;
+          surface(wx, wz, this.N >= 48, S);
           hs[b + c] = S.h;
           ds[b + c] = S.desert;
           ts[b + c] = S.trail;
+          rd[b + c] = S.trailD;
+          if (S.trail > 0.001) {
+            const sd = trailSigned(wx, wz);
+            rs[b + c] = sd;
+            rgx[b + c] = trailSigned(wx + 1, wz) - sd;
+            rgz[b + c] = trailSigned(wx, wz + 1) - sd;
+          } else {
+            rs[b + c] = 1e3; rgx[b + c] = 1; rgz[b + c] = 0;
+          }
           if (S.h < this.minY) this.minY = S.h;
           if (S.h > this.maxY) this.maxY = S.h;
         }
@@ -221,7 +280,7 @@ class ChunkJob {
   }
 
   buildGeometry() {
-    const { N, E, d, hs, ds, ts } = this;
+    const { N, E, d, hs, ds, ts, rd, rs, rgx, rgz } = this;
     const gw = N + 1;
     const main = gw * gw;
     const border = gw * 4;
@@ -232,6 +291,7 @@ class ChunkJob {
     const uv = new Float32Array(total * 2);
     const spl = new Float32Array(total * 4);
     const ao = new Float32Array(total);
+    const road = new Float32Array(total * 3);
 
     const S = { h: 0, desert: 0, land: 0, trail: 0, base: 0 };
     const sp = [0, 0, 0, 0];
@@ -273,8 +333,14 @@ class ChunkJob {
         uv[vi * 2] = (j * d) / TILE;
         uv[vi * 2 + 1] = (i * d) / TILE;
 
-        S.h = h; S.desert = ds[r * E + c]; S.trail = ts[r * E + c];
+        S.h = h; S.desert = ds[r * E + c]; S.trail = ts[r * E + c]; S.trailD = rd[r * E + c];
         splat(S, ny * inv, sp);
+        // road frame: signed distance across, unit tangent along
+        const gx = rgx[r * E + c], gz = rgz[r * E + c];
+        const gl = Math.hypot(gx, gz) || 1;
+        road[vi * 3] = rs[r * E + c];
+        road[vi * 3 + 1] = -gz / gl;
+        road[vi * 3 + 2] = gx / gl;
         spl[vi * 4] = sp[0]; spl[vi * 4 + 1] = sp[1];
         spl[vi * 4 + 2] = sp[2]; spl[vi * 4 + 3] = sp[3];
       }
@@ -290,6 +356,7 @@ class ChunkJob {
       spl[dst * 4] = spl[src * 4]; spl[dst * 4 + 1] = spl[src * 4 + 1];
       spl[dst * 4 + 2] = spl[src * 4 + 2]; spl[dst * 4 + 3] = spl[src * 4 + 3];
       ao[dst] = ao[src];
+      road[dst * 3] = road[src * 3]; road[dst * 3 + 1] = road[src * 3 + 1]; road[dst * 3 + 2] = road[src * 3 + 2];
     };
     const skTop = main, skBot = main + gw, skLeft = main + gw * 2, skRight = main + gw * 3;
     for (let j = 0; j <= N; j++) {
@@ -334,6 +401,7 @@ class ChunkJob {
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     g.setAttribute('aSplat', new THREE.BufferAttribute(spl, 4));
     g.setAttribute('aAO', new THREE.BufferAttribute(ao, 1));
+    g.setAttribute('aRoad', new THREE.BufferAttribute(road, 3));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.boundingSphere = new THREE.Sphere(
       new THREE.Vector3(CHUNK / 2, (this.minY + this.maxY) / 2, CHUNK / 2),
@@ -390,6 +458,7 @@ class ChunkJob {
     t.scene.add(group);
     t.chunks.set(this.key, rec);
     this.ds = null; this.ts = null; this.geometry = null;
+    this.rd = this.rs = this.rgx = this.rgz = null;
   }
 
   /* ---------------- vegetation ---------------- */

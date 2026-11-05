@@ -335,8 +335,77 @@ function finish(P) {
   return out;
 }
 
+/* ======================== PHOTO SURFACES ========================
+   The chalets are untextured shapes (the primitives' UVs are stretched
+   per face), so real material is added triplanar in each building's own
+   space — it sticks to the instance and needs no UVs:
+     logs   weathered log-wall scan, grain running along every log; the
+            scan is stretched across the logs so its own seams never cut
+            through the modelled ones
+     roof   wooden-shingle scan projected from the sides only, so the rows
+            follow the slope whichever way the ridge runs
+     stone  stacked-stone scan under the whitewash of the plinth, chimney
+            and steps
+   Each photo is divided by its own average colour, so it modulates the
+   hand-picked palette instead of replacing it. */
+function addPhoto(mat, tex, mean, mode, strength) {
+  if (!tex || !mean) return mat;
+  mat.defines = { ...(mat.defines || {}), PH_STRENGTH: strength.toFixed(3) };
+  if (mode === 'logs') mat.defines.PH_LOGS = '';
+  if (mode === 'roof') mat.defines.PH_ROOF = '';
+  const prev = mat.onBeforeCompile;
+  const prevKey = mat.customProgramCacheKey;
+  mat.onBeforeCompile = (sh, renderer) => {
+    if (prev) prev.call(mat, sh, renderer);
+    sh.uniforms.tPhoto = { value: tex };
+    sh.uniforms.uPhotoMean = { value: mean };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vPhP;
+        varying vec3 vPhN;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vPhP = position;
+        vPhN = normal;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform sampler2D tPhoto;
+        uniform vec3 uPhotoMean;
+        varying vec3 vPhP;
+        varying vec3 vPhN;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 w = pow( abs( normalize( vPhN ) ), vec3( 4.0 ) );
+          vec3 p = vPhP;
+          #if defined( PH_LOGS )
+            // across the logs: barely moves (one scan log per modelled log);
+            // along them: real scale, about 1.2 m per tile
+            vec3 t = texture2D( tPhoto, vec2( p.y * 0.07, p.z * 0.8 ) ).rgb * w.x +
+                     texture2D( tPhoto, vec2( p.z * 0.4, p.x * 0.4 ) ).rgb * w.y +
+                     texture2D( tPhoto, vec2( p.y * 0.07, p.x * 0.8 ) ).rgb * w.z;
+          #elif defined( PH_ROOF )
+            w.y *= 0.02;
+            // sides only, y stretched to undo the slope's foreshortening
+            vec3 t = texture2D( tPhoto, vec2( p.z, p.y * 1.41 ) * 0.33 ).rgb * w.x +
+                     texture2D( tPhoto, p.xz * 0.33 ).rgb * w.y +
+                     texture2D( tPhoto, vec2( p.x, p.y * 1.41 ) * 0.33 ).rgb * w.z;
+          #else
+            vec3 t = texture2D( tPhoto, p.zy * 0.5 ).rgb * w.x +
+                     texture2D( tPhoto, p.xz * 0.5 ).rgb * w.y +
+                     texture2D( tPhoto, p.xy * 0.5 ).rgb * w.z;
+          #endif
+          t /= max( 1e-4, w.x + w.y + w.z );
+          // capped: a dark scan's bright streaks would otherwise read as gold
+          vec3 d = clamp( t / uPhotoMean, 0.35, 1.7 );
+          d = mix( vec3( dot( d, vec3( 0.2126, 0.7152, 0.0722 ) ) ), d, 0.45 );
+          diffuseColor.rgb *= mix( vec3( 1.0 ), d, PH_STRENGTH );
+        }`);
+  };
+  mat.customProgramCacheKey = () => (prevKey ? prevKey.call(mat) : '') + '_photo_' + mode;
+  return mat;
+}
+
 /* =========================== LIBRARY =========================== */
-export function buildVillageLibrary() {
+export function buildVillageLibrary(textures = null) {
   const mk = (extra = {}) => new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.86, metalness: 0.0, side: THREE.DoubleSide, ...extra
   });
@@ -355,6 +424,21 @@ export function buildVillageLibrary() {
       roughness: 0.4, metalness: 0, side: THREE.DoubleSide
     })
   };
+  if (textures && textures.photoMean) {
+    const pm = textures.photoMean;
+    addPhoto(mats.wood, textures.logs, pm.logs, 'logs', 0.85);
+    addPhoto(mats.roof, textures.roof, pm.roof, 'roof', 1.0);
+    addPhoto(mats.stone, textures.stone, pm.stone, 'stone', 0.8);
+    // weathered whitewash rather than fresh white paint; shingles are matte
+    mats.stone.color.set(0xc2bbae);
+    mats.roof.roughness = 0.92;
+    // weathered shingles go silver-brown, not near-black
+    mats.roof.color.setRGB(2.1, 2.0, 1.85);
+    mats.roof.envMapIntensity = 0.55;
+    mats.wood.envMapIntensity = 0.6;
+    // sun-darkened larch, the colour of old alpine chalets
+    mats.wood.color.setRGB(0.62, 0.54, 0.47);
+  }
 
   return {
     mats,

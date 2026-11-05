@@ -53,6 +53,66 @@ export function waveVelAt(x, z, t, depth = 40) {
   return v;
 }
 
+/* ---------------- ripple normal map ----------------
+   The small waves riding on the swell. Built once at load from a
+   wind-wave spectrum: a few dozen directional sine waves fanned around the
+   wind, amplitude falling with wavenumber the way real capillary and
+   gravity ripples do. Integer wavenumbers make it tile seamlessly, and
+   cos(a+b) = cos a·cos b − sin a·sin b turns the inner loop into
+   multiplies, so even 512² takes a few milliseconds. Stores the surface
+   normal, scaled to a realistic slope (RMS ≈ 0.17). */
+function makeRippleNormals(size) {
+  let seed = 1234567;
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const wind = 0.6;
+  const waves = [];
+  while (waves.length < 64) {
+    const ang = wind + (rand() - 0.5) * 2.4;
+    const k = 2 + Math.pow(rand(), 1.7) * 30;
+    const kx = Math.round(Math.cos(ang) * k), ky = Math.round(Math.sin(ang) * k);
+    if (!kx && !ky) continue;
+    waves.push({ kx, ky, a: Math.pow(Math.hypot(kx, ky), -1.3), ph: rand() * 6.2832 });
+  }
+  const gx = new Float32Array(size * size), gy = new Float32Array(size * size);
+  const cx = new Float32Array(size), sx = new Float32Array(size);
+  const cy = new Float32Array(size), sy = new Float32Array(size);
+  for (const w of waves) {
+    for (let i = 0; i < size; i++) {
+      const ax = 6.2832 * w.kx * i / size + w.ph, ay = 6.2832 * w.ky * i / size;
+      cx[i] = Math.cos(ax); sx[i] = Math.sin(ax);
+      cy[i] = Math.cos(ay); sy[i] = Math.sin(ay);
+    }
+    const fx = w.a * w.kx, fy = w.a * w.ky;
+    for (let y = 0; y < size; y++) {
+      const row = y * size, c2 = cy[y], s2 = sy[y];
+      for (let x = 0; x < size; x++) {
+        const c = cx[x] * c2 - sx[x] * s2;            // cos(phase)
+        gx[row + x] += c * fx;
+        gy[row + x] += c * fy;
+      }
+    }
+  }
+  let ms = 0;
+  for (let i = 0; i < gx.length; i++) ms += gx[i] * gx[i] + gy[i] * gy[i];
+  const k = 0.17 / Math.sqrt(ms / gx.length);
+  const data = new Uint8Array(size * size * 4);
+  for (let i = 0; i < gx.length; i++) {
+    const nx = -gx[i] * k, ny = -gy[i] * k, inv = 1 / Math.hypot(nx, ny, 1);
+    data[i * 4] = (nx * inv * 0.5 + 0.5) * 255;
+    data[i * 4 + 1] = (ny * inv * 0.5 + 0.5) * 255;
+    data[i * 4 + 2] = (inv * 0.5 + 0.5) * 255;
+    data[i * 4 + 3] = 255;
+  }
+  const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 4;
+  t.needsUpdate = true;
+  return t;
+}
+
 /* The wave table goes to the GPU as uniforms: GLSL ES 1.00 (which three
    uses for ShaderMaterial) has no array constructors, and uniform arrays
    indexed by a loop counter are legal there. */
@@ -194,6 +254,7 @@ uniform vec3  uFogColor;
 uniform float uFogDensity;
 uniform float uNight;
 uniform sampler2D uField;
+uniform sampler2D uRipples;
 uniform vec2  uFieldCenter;
 uniform float uFieldSpan;
 
@@ -217,21 +278,19 @@ float vn( vec2 p ){
   return mix( mix( a, b, f.x ), mix( c, d, f.x ), f.y );
 }
 
-/* Stacked scrolling ripples. Each octave drifts on its own heading so the
-   surface never shows a repeating pattern. */
+/* Ripples: the spectrum-built normal map at three scales (~22 m, ~8 m,
+   ~2.4 m), each drifting on its own heading so nothing visibly repeats. */
+vec2 rot( vec2 v, float a ){ float c = cos( a ), s = sin( a ); return vec2( c * v.x - s * v.y, s * v.x + c * v.y ); }
+vec2 rip( vec2 p, float a, float sc, vec2 drift, float t ){
+  // sample in a rotated frame, then rotate the slope back into world space
+  vec2 n = texture2D( uRipples, rot( p, a ) * sc + drift * t ).xy * 2.0 - 1.0;
+  return rot( n, -a );
+}
 vec3 rippleNormal( vec2 p, float t, float strength ) {
-  vec2 g = vec2( 0.0 );
-  float amp = 1.0, frq = 0.085, e = 0.55;
-  for ( int i = 0; i < 5; i++ ) {
-    vec2 drift = vec2( sin( float( i ) * 2.13 ), cos( float( i ) * 1.71 ) ) * t * ( 0.35 + float( i ) * 0.22 );
-    vec2 q = p * frq + drift;
-    float n0 = vn( q );
-    float nx = vn( q + vec2( e, 0.0 ) );
-    float nz = vn( q + vec2( 0.0, e ) );
-    g += vec2( nx - n0, nz - n0 ) * amp;
-    amp *= 0.55; frq *= 2.35; e *= 1.0;
-  }
-  return normalize( vec3( -g.x * strength, 1.0, -g.y * strength ) );
+  vec2 g = rip( p, 0.37, 0.031, vec2( 0.008, 0.005 ), t )
+         + rip( p, 2.11, 0.083, vec2( -0.014, 0.011 ), t ) * 0.8
+         + rip( p, 4.03, 0.23,  vec2( 0.026, -0.03 ), t ) * 0.55;
+  return normalize( vec3( g.x * strength, 1.0, g.y * strength ) );
 }
 
 vec3 skyColour( vec3 rd ) {
@@ -250,7 +309,7 @@ void main() {
   /* ---- surface normal: swell + ripples, ripples fading with distance ---- */
   float ripFade = 1.0 - smoothstep( 25.0, 700.0, distC );
   float choppy  = 0.55 + 0.45 * vShoal;
-  vec3  rip = rippleNormal( vWorld.xz, uTime, 2.6 * choppy );
+  vec3  rip = rippleNormal( vWorld.xz, uTime, 1.55 * choppy );
   vec3  N   = normalize( mix( vNrm, normalize( vNrm * 0.55 + rip ), ripFade ) );
   // never let the normal face away at grazing angles — that is what makes
   // cheap water look like plastic
@@ -334,8 +393,8 @@ export class Ocean {
       uSunColor:    { value: new THREE.Color(1.0, 0.93, 0.82) },
       uSkyTop:      { value: new THREE.Color(0.16, 0.35, 0.66) },
       uSkyHorizon:  { value: new THREE.Color(0.66, 0.78, 0.92) },
-      uDeep:        { value: new THREE.Color(0.010, 0.055, 0.098) },
-      uShallow:     { value: new THREE.Color(0.075, 0.44, 0.44) },
+      uDeep:        { value: new THREE.Color(0.006, 0.034, 0.060) },
+      uShallow:     { value: new THREE.Color(0.050, 0.30, 0.31) },
       uFogColor:    { value: new THREE.Color(0.72, 0.80, 0.88) },
       uFogDensity:  { value: 0.00012 },
       uField:       { value: heightField.texture },
@@ -343,6 +402,7 @@ export class Ocean {
       uFieldSpan:   { value: heightField.span },
       uBand:        { value: heightField.BAND },
       uNight:       { value: 0 },
+      uRipples:     { value: makeRippleNormals(quality.tier === 'low' ? 256 : 512) },
       ...waveUniforms()
     };
 
