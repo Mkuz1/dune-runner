@@ -86,6 +86,8 @@ export class VehiclePhysics {
     this.flying = false;
     this.flyPower = 0;
     this.yaw = 0;
+    this.yawRate = 0;
+    this.climbS = 0;
     this.pitchVis = 0;
     this.bankVis = 0;
     this.boost = 1;
@@ -121,6 +123,8 @@ export class VehiclePhysics {
     this.flying = false;
     this.flyPower = 0;
     this.yaw = 0;
+    this.yawRate = 0;
+    this.climbS = 0;
     this.pitchVis = this.bankVis = 0;
   }
 
@@ -141,6 +145,8 @@ export class VehiclePhysics {
       if (this.flying) {
         this.flyPower = 0;
         this.yaw = this.yawAngle();
+        this.yawRate = 0;
+        this.climbS = 0;
         this.angVel.set(0, 0, 0);
       }
     }
@@ -288,13 +294,21 @@ export class VehiclePhysics {
       const slipAngle = Math.atan2(vR, Math.abs(vF) + 0.8);
       let fLat = -slipAngle * (w.steers ? 7.6 : 8.8) * N * (hb ? 0.10 : 1);
 
-      // ---- friction circle
+      /* ---- friction circle, with a real tyre's shape.
+         Demand rises linearly with slip, then a measured tyre rounds off as
+         it nears the limit and loses a little grip once it is properly
+         sliding. A hard clip at the limit (what this used to do) makes the
+         force jump between "gripping" and "sliding" from one step to the
+         next: slides start with a snap and the chassis jolts. */
       const limit = mu * N * (hb ? 0.62 : 1);
       const mag = Math.hypot(fLong, fLat);
-      if (mag > limit && mag > 1e-3) {
-        const k = limit / mag;
+      if (mag > 1e-3 && limit > 1e-3) {
+        const x = mag / limit;
+        let f = x < 0.7 ? x : 0.7 + 0.3 * Math.tanh((x - 0.7) / 0.3);
+        f *= 1 - 0.12 * smoothstep(1.4, 3.2, x);          // sliding friction < peak
+        const k = f / x;
         fLong *= k; fLat *= k;
-        w.slip = clamp((mag / limit - 1) * 0.6, 0, 1);
+        w.slip = clamp((x - 1) * 0.6, 0, 1);
       } else w.slip = 0;
       slipSum += w.slip;
 
@@ -408,7 +422,10 @@ export class VehiclePhysics {
     // thrusters cancel gravity once spooled up
     _force.y += GRAV * MASS * this.flyPower;
 
-    const climb = (input.lift ? 1 : 0) - (input.descend ? 1 : 0);
+    // climb and descend ease in and out (~0.3 s) instead of switching
+    const climbT = (input.lift ? 1 : 0) - (input.descend ? 1 : 0);
+    this.climbS += (climbT - this.climbS) * (1 - Math.exp(-7 * dt));
+    const climb = Math.abs(this.climbS) < 0.01 && !climbT ? 0 : this.climbS;
     _force.y += climb * (boosting ? 32000 : 18500) * this.flyPower;
 
     // thinning air near the ceiling
@@ -432,7 +449,10 @@ export class VehiclePhysics {
     this.pos.addScaledVector(this.vel, dt);
 
     // ---- attitude: yaw integrates, pitch and bank follow the controls
-    this.yaw += -input.steer * 1.30 * dt * (0.55 + 0.45 * this.flyPower);
+    // turn rate builds and settles like an aircraft's, not on/off
+    const yawRateT = -input.steer * 1.30 * (0.55 + 0.45 * this.flyPower);
+    this.yawRate += (yawRateT - this.yawRate) * (1 - Math.exp(-4.5 * dt));
+    this.yaw += this.yawRate * dt;
     const bankT = -input.steer * 0.66;
     const pitchT = clamp(-this.vel.y * 0.020 + input.throttle * 0.05, -0.42, 0.42);
     const k = 1 - Math.exp(-5.5 * dt);
@@ -479,7 +499,14 @@ export class VehiclePhysics {
     this.angVel.x += (e[0] * ax + e[3] * ay + e[6] * az) * dt;
     this.angVel.y += (e[1] * ax + e[4] * ay + e[7] * az) * dt;
     this.angVel.z += (e[2] * ax + e[5] * ay + e[8] * az) * dt;
-    this.angVel.multiplyScalar(1 - Math.min(0.35, 2.0 * dt));
+    /* A little artificial damping keeps the integrator calm, but on the
+       ground the tyres already resist yaw; damping it hard as well made the
+       steering feel mushy and the truck reluctant to rotate. */
+    const dRoll = 1 - Math.min(0.35, 2.0 * dt);
+    const dYaw = 1 - Math.min(0.35, (this.grounded ? 0.8 : 2.0) * dt);
+    _up.set(0, 1, 0).applyQuaternion(this.quat);
+    const wy = this.angVel.dot(_up);
+    this.angVel.addScaledVector(_up, -wy).multiplyScalar(dRoll).addScaledVector(_up, wy * dYaw);
 
     this.integrateRotation(dt);
   }

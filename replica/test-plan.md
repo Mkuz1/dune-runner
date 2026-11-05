@@ -14,7 +14,7 @@ text input), second user's data, expired session, time zones and DST (the
 in-game clock is simulated), card declined (no payments). Two tabs at once is
 covered by F01-E5.
 
-Result: **37 automated cases, 37 pass** (34 desktop + 3 phone) after fixing
+Result: **41 automated cases, 41 pass** (38 desktop + 3 phone) after fixing
 BUG-001; 4 manual cases need a real phone. Run: `npx playwright test`.
 
 Every automated spec also fails on: any console error, any 4xx/5xx response
@@ -62,4 +62,7 @@ for the game's own files, and (where marked) axe accessibility violations.
 | F13-M1 | | manual: Android update | install 1.2.7, open, accept update | download progress, system installer, app reopens on 1.2.8 | manual | not run: needs a real device |
 | F13-M2 | | manual: iOS update | install 1.2.7 IPA, open | "Update available" with AltStore/SideStore or Download .ipa → share sheet | manual | not run: needs a real device |
 | F13-M3 | | manual: offline launch | airplane mode, open the app | no update prompt, no error, game runs | manual | not run: needs a real device |
+| F14-H1 | motion quality | happy | scripted drive in desert and forest, record every frame | camera jitter < 8 mm/frame, aim jitter < 0.5 mrad, take-off pitch jolt < 0.1 rad/s | e2e | pass (2.5 / 3.1 mm; was ~33) |
+| F14-E1 | | edge: throttle ramp | press ↑ | throttle starts partial, reaches full within ~0.7 s | e2e | pass |
+| F14-E2 | | edge: flight turn | in flight hold ← | turn rate builds smoothly, no jump | e2e | pass |
 | F14-M1 | device performance | manual | play forest, desert, village, coast on a mid-range phone (Medium) | steady frame rate, no stutter when trees stream in | manual | not run: needs a real device |

@@ -1,6 +1,13 @@
 /* ------------------------------------------------------------------
    camera.js — chase camera with four modes, speed FOV, terrain
    avoidance and a little shake when the ride gets rough.
+
+   Smoothness: the camera never tracks the raw rigid body. It follows a
+   filtered copy of it — tight horizontally, loose vertically — so the
+   suspension can work over every bump without the view bouncing with it,
+   and it reads heading and velocity through low-pass filters too. Shake is
+   a smooth sum of sines, not per-frame random noise, and only kicks in on
+   hard landings and genuinely rough ground.
 ------------------------------------------------------------------ */
 
 import * as THREE from '../libs/three/three.module.js';
@@ -47,6 +54,10 @@ export class ChaseCamera {
     this.rollVis = 0;
     this.initialised = false;
     this.baseFov = quality.fov;
+    this.body = new THREE.Vector3();      // filtered truck position
+    this.velS = new THREE.Vector3();      // filtered velocity
+    this.yawS = 0;                        // filtered heading
+    this.t = 0;
   }
 
   cycle() {
@@ -58,9 +69,27 @@ export class ChaseCamera {
   update(dt, phys, input) {
     const M = MODES[this.mode];
     const speed = phys.speed;
+    this.t += dt;
 
-    // heading: follow the body yaw, but keep the horizon level on the ground
-    const yaw = phys.flying ? phys.yaw : phys.yawAngle();
+    // filtered body: horizontal follows closely, vertical soaks up the bumps
+    if (!this.initialised) {
+      this.body.copy(phys.pos);
+      this.velS.copy(phys.vel);
+      this.yawS = phys.flying ? phys.yaw : phys.yawAngle();
+    }
+    const kH = 1 - Math.exp(-18 * dt);
+    const kV = 1 - Math.exp(-(phys.flying ? 8 : 4.5) * dt);
+    this.body.x += (phys.pos.x - this.body.x) * kH;
+    this.body.z += (phys.pos.z - this.body.z) * kH;
+    this.body.y += (phys.pos.y - this.body.y) * kV;
+    this.velS.lerp(phys.vel, 1 - Math.exp(-4 * dt));
+
+    // heading: follow the body yaw smoothly, keeping the horizon level
+    const yawRaw = phys.flying ? phys.yaw : phys.yawAngle();
+    let dy = yawRaw - this.yawS;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    this.yawS += dy * (1 - Math.exp(-7 * dt));
+    const yaw = this.yawS;
     const lookYaw = yaw + input.lookX;
     const lookPitch = input.lookY;
 
@@ -87,10 +116,10 @@ export class ChaseCamera {
       rise + Math.sin(lookPitch) * back,
       -Math.cos(lookYaw) * back * Math.cos(lookPitch)
     );
-    _v.copy(phys.pos).add(_off);
+    _v.copy(this.body).add(_off);
 
     // lead the camera with velocity so fast driving feels fast
-    _v.addScaledVector(phys.vel, 0.085);
+    _v.addScaledVector(this.velS, 0.085);
 
     if (!this.initialised) { this.pos.copy(_v); this.initialised = true; }
 
@@ -99,22 +128,25 @@ export class ChaseCamera {
 
     // never let the camera sink into a dune or the sea
     const gh = Math.max(heightAt(this.pos.x, this.pos.z), SEA_LEVEL - 0.4) + 1.9;
-    if (this.pos.y < gh) this.pos.y = lerp(this.pos.y, gh, 0.55);
+    if (this.pos.y < gh) this.pos.y = lerp(this.pos.y, gh, 1 - Math.exp(-25 * dt));
 
     // look at a point slightly ahead of the truck
-    _t.copy(phys.pos);
+    _t.copy(this.body);
     _t.y += M.look;
-    _t.addScaledVector(phys.vel, 0.10);
+    _t.addScaledVector(this.velS, 0.10);
     this.target.lerp(_t, 1 - Math.exp(-10 * dt));
 
-    // shake: rough ground, wheel slip, hard landings
-    const rough = clamp((phys.wheelSlip * 0.8 + phys.landedHard * 1.6) * clamp(speed / 20, 0, 1), 0, 1);
-    this.shake = lerp(this.shake, rough, 1 - Math.exp(-8 * dt));
-    const amp = this.shake * 0.16;
+    /* shake: hard landings and heavy wheelspin at speed. A smooth sum of
+       sines at a few hertz reads as the chassis shuddering; per-frame
+       random offsets read as the screen vibrating. */
+    const rough = clamp((Math.max(0, phys.wheelSlip - 0.25) * 0.6 + phys.landedHard * 1.6) * clamp(speed / 20, 0, 1), 0, 1);
+    this.shake = lerp(this.shake, rough, 1 - Math.exp(-6 * dt));
+    const amp = this.shake * 0.07;
+    const t = this.t;
     this.cam.position.set(
-      this.pos.x + (Math.random() - 0.5) * amp,
-      this.pos.y + (Math.random() - 0.5) * amp,
-      this.pos.z + (Math.random() - 0.5) * amp
+      this.pos.x + (Math.sin(t * 11.3) * 0.6 + Math.sin(t * 17.9 + 1.3) * 0.4) * amp,
+      this.pos.y + (Math.sin(t * 13.7 + 2.1) * 0.6 + Math.sin(t * 21.1 + 0.4) * 0.4) * amp,
+      this.pos.z + (Math.sin(t * 9.1 + 4.2) * 0.6 + Math.sin(t * 19.3 + 2.7) * 0.4) * amp
     );
 
     // subtle roll into corners

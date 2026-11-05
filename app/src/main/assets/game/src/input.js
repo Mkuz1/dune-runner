@@ -269,21 +269,36 @@ export class Input {
     s.steer += (steerRaw - s.steer) * kSmooth;
     if (Math.abs(s.steer) < 0.001) s.steer = 0;
 
+    /* Pedals. Keys are on/off, but a real foot takes a moment to go down
+       and comes off a little quicker, so digital throttle and brake ramp in
+       (~0.25 s) and out (~0.15 s). Without it every key press slams full
+       drive torque on instantly and the body jolts. Triggers and the touch
+       stick are already analogue and pass through almost untouched. */
+    let thrT = 0, brkT = 0;
     if (flying) {
       // forward flies level; pulling back drops the altitude rather than
       // braking, which is what the down control should obviously do up here
-      s.throttle = up;
-      s.brake = 0;
+      thrT = up;
       s.pitch = 0;
       if (down > 0.15) descend = true;
     } else {
-      if (up && !down) { s.throttle = up; s.brake = 0; }
+      if (up && !down) thrT = up;
       else if (down && !up) {
-        if (forwardSpeed > 1.2) { s.throttle = 0; s.brake = down; }
-        else { s.throttle = -down * 0.55; s.brake = 0; }
-      } else { s.throttle = 0; s.brake = 0; }
+        if (forwardSpeed > 1.2) brkT = down;
+        else thrT = -down * 0.55;
+      }
       s.pitch = (up ? -0.6 : 0) + (down ? 0.6 : 0);   // air control on jumps
     }
+    const pedal = (cur, target) => {
+      const analoguePedal = (st && st.active) || (gp && gp.connected);
+      const rise = analoguePedal ? 30 : 9, fall = analoguePedal ? 30 : 14;
+      const k = 1 - Math.exp(-(Math.abs(target) > Math.abs(cur) ? rise : fall) * dt);
+      const v = cur + (target - cur) * k;
+      return Math.abs(v - target) < 0.004 ? target : v;
+    };
+    // reversing direction goes through zero instead of flipping instantly
+    s.throttle = (s.throttle * thrT < 0) ? pedal(s.throttle, 0) : pedal(s.throttle, thrT);
+    s.brake = pedal(s.brake, brkT);
 
     s.boost = boost;
     s.boostArmed = this._tapBoost;
