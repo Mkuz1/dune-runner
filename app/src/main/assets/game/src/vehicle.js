@@ -571,14 +571,57 @@ export class Vehicle {
     this.M.metal.roughness = 0.55;
     this.M.rubber.color.set(0x242526); this.M.rubber.roughness = 0.84;   // aged rubber, not black
 
+    /* Baked texture sets (modelled and baked in Blender, surface detail
+       from Draw Things): colour, tangent-space normal, and occlusion /
+       roughness packed into one image (R / G), one set per part. Each
+       part's meshes get their own copy of the tuned game
+       material with those maps attached, so paint keeps its clear coat and
+       glass stays glass. Missing textures leave the plain materials. */
+    const tex = await this.loadPartTextures();
+    const NO_MAPS = new Set(['glass', 'tint', 'lampWhite', 'lampRed', 'lampAmber']);
+    const partOf = (o) => {
+      for (let p = o; p; p = p.parent) {
+        const m = /^p6_(body|cab|detail|wheel|spare)/.exec(p.name || '');
+        if (m) return m[1] === 'spare' ? 'wheel' : m[1];
+      }
+      return null;
+    };
+    const textured = new Map();
+    const texturedMat = (key, part, geo) => {
+      const id = part + ':' + key;
+      if (textured.has(id)) return textured.get(id);
+      const set = tex[part];
+      const m = this.M[key].clone();
+      m.color.set(0xffffff);                 // the colour lives in the map now
+      m.map = set.col;
+      m.normalMap = set.nrm;
+      // glTF normal maps need Y flipped unless the mesh carries tangents
+      m.normalScale.set(1, geo.attributes.tangent ? 1 : -1);
+      // occlusion (R) and roughness (G) are baked; metalness stays the
+      // tuned per-material value, since it never varies within a material
+      m.aoMap = set.orm; m.aoMapIntensity = 1;
+      m.roughnessMap = set.orm; m.roughness = 1;
+      m.vertexColors = false;
+      m.needsUpdate = true;
+      textured.set(id, m);
+      return m;
+    };
+    this.textured = !!tex;
+
     const remap = (obj) => obj.traverse(o => {
       if (!o.isMesh) return;
       const key = o.material && o.material.name;
       if (key && this.M[key]) {
-        o.material.dispose(); o.material = this.M[key];
-        /* the model carries baked occlusion + road dust as vertex colours */
-        if (o.geometry.attributes.color && !o.material.vertexColors) {
-          o.material.vertexColors = true; o.material.needsUpdate = true;
+        o.material.dispose();
+        const part = tex && !NO_MAPS.has(key) && o.geometry.attributes.uv ? partOf(o) : null;
+        if (part && tex[part]) {
+          o.material = texturedMat(key, part, o.geometry);
+        } else {
+          o.material = this.M[key];
+          /* the plain model carries baked occlusion + road dust as vertex colours */
+          if (o.geometry.attributes.color && !o.material.vertexColors) {
+            o.material.vertexColors = true; o.material.needsUpdate = true;
+          }
         }
       }
       o.castShadow = key !== 'glass';
@@ -625,8 +668,36 @@ export class Vehicle {
       this.glowRear[1].position.set(0.90, 1.27, -2.99);
     }
     this.modelLoaded = true;
-    this.addGrime();
+    // the baked textures already carry the dust and mud
+    if (!this.textured) this.addGrime();
     return true;
+  }
+
+  /** Load the baked per-part textures, or null if any are missing. */
+  async loadPartTextures() {
+    const L = new THREE.TextureLoader();
+    const aniso = (this.q && this.q.aniso) || 4;
+    const load = (url, srgb) => L.loadAsync(url).then((t) => {
+      t.flipY = false;                       // glTF UV convention
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = aniso;
+      return t;
+    });
+    try {
+      const out = {};
+      await Promise.all(['body', 'cab', 'detail', 'wheel'].map(async (k) => {
+        const [col, nrm, orm] = await Promise.all([
+          load(`./models/truck/${k}_col.jpg`, true),
+          load(`./models/truck/${k}_nrm.jpg`, false),
+          load(`./models/truck/${k}_orm.jpg`, false)
+        ]);
+        out[k] = { col, nrm, orm };
+      }));
+      return out;
+    } catch (e) {
+      console.warn('vehicle: baked truck textures not found, using plain materials');
+      return null;
+    }
   }
 
   /* ---------------------------------------------------------------- grime

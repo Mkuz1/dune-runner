@@ -1,10 +1,13 @@
 // Motion-quality metrics, recorded in the real game during a scripted drive.
 // Used by f14-motion.spec.ts; also handy on its own when tuning the feel.
 //
-//   camJitter   high-frequency camera motion: mean |second difference| of the
-//               camera position per frame, in mm. Smooth tracking ≈ small;
+//   camJitter   high-frequency camera motion: mean change of the camera's
+//               velocity from one frame to the next, scaled to a 60 fps frame
+//               (mm). Uses the real frame timestamps, so a long frame (a
+//               hitch) does not count as a jump. Smooth tracking ≈ small;
 //               random shake or bumps passed straight through ≈ large.
 //   aimJitter   the same for where the camera points, in milli-radians.
+//   hitches     frames that took more than 1.5× the median frame time.
 //   bumpRms     RMS vertical acceleration of the truck (m/s²): how bumpy the
 //               ride is. Taken from the physics velocity and the browser's own
 //               frame timestamps, so frame-timing noise does not inflate it.
@@ -13,7 +16,7 @@
 //               full throttle (rad/s): how hard it rocks back on take-off.
 import { Page } from '@playwright/test';
 
-export type Metrics = { camJitter: number; aimJitter: number; bumpRms: number; wobbleRms: number; pitchJolt: number; frames: number; avgKmh: number };
+export type Metrics = { camJitter: number; aimJitter: number; bumpRms: number; wobbleRms: number; pitchJolt: number; frames: number; hitches: number; avgKmh: number };
 
 export async function recordDrive(page: Page, seconds = 6): Promise<Metrics> {
   await page.evaluate(() => {
@@ -56,10 +59,19 @@ export async function recordDrive(page: Page, seconds = 6): Promise<Metrics> {
     const r = w.__rec as any[];
     const n = r.length;
     let cam = 0, aim = 0, bump = 0, nb = 0, wob = 0, pitchJolt = 0, kmh = 0;
+    const dts: number[] = [];
+    for (let i = 1; i < n; i++) dts.push((r[i].t - r[i - 1].t) / 1000);
+    const med = [...dts].sort((x, y) => x - y)[dts.length >> 1] || 1 / 60;
+    const hitches = dts.filter((d) => d > med * 1.5).length;
+    const F = 1 / 60;
     for (let i = 2; i < n; i++) {
       const a = r[i], b = r[i - 1], c = r[i - 2];
-      cam += Math.hypot(a.cx - 2 * b.cx + c.cx, a.cy - 2 * b.cy + c.cy, a.cz - 2 * b.cz + c.cz);
-      aim += Math.hypot(a.dx - 2 * b.dx + c.dx, a.dy - 2 * b.dy + c.dy, a.dz - 2 * b.dz + c.dz);
+      const d1 = Math.max(1e-3, (a.t - b.t) / 1000), d0 = Math.max(1e-3, (b.t - c.t) / 1000);
+      // acceleration between consecutive frames, as a displacement over one
+      // 60 fps frame (equals the plain second difference at a steady 60 fps)
+      const dv = (k: string) => ((a[k] - b[k]) / d1 - (b[k] - c[k]) / d0) / ((d1 + d0) / 2) * F * F;
+      cam += Math.hypot(dv('cx'), dv('cy'), dv('cz'));
+      aim += Math.hypot(dv('dx'), dv('dy'), dv('dz'));
       kmh += a.spd * 3.6;
     }
     for (let i = 1; i < n; i++) {
@@ -90,6 +102,7 @@ export async function recordDrive(page: Page, seconds = 6): Promise<Metrics> {
       wobbleRms: +Math.sqrt(wob / Math.max(1, nb)).toFixed(3),
       pitchJolt: +pitchJolt.toFixed(3),
       frames: n,
+      hitches,
       avgKmh: +(kmh / m).toFixed(1)
     };
   });

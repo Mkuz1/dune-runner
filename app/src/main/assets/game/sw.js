@@ -15,7 +15,7 @@
        when CACHE is bumped, and they are the bulk of the bytes.
 
    Bump CACHE on every deploy. */
-const CACHE = 'dune-runner-v10';
+const CACHE = 'dune-runner-v11';
 const ASSETS = [
   "./",
   "./index.html",
@@ -46,6 +46,18 @@ const ASSETS = [
   "./libs/three/addons/objects/Sky.js",
   "./libs/three/addons/loaders/GLTFLoader.js",
   "./models/pickup6x6.glb",
+  "./models/truck/body_col.jpg",
+  "./models/truck/body_nrm.jpg",
+  "./models/truck/body_orm.jpg",
+  "./models/truck/cab_col.jpg",
+  "./models/truck/cab_nrm.jpg",
+  "./models/truck/cab_orm.jpg",
+  "./models/truck/detail_col.jpg",
+  "./models/truck/detail_nrm.jpg",
+  "./models/truck/detail_orm.jpg",
+  "./models/truck/wheel_col.jpg",
+  "./models/truck/wheel_nrm.jpg",
+  "./models/truck/wheel_orm.jpg",
   "./textures/sand.jpg",
   "./textures/sand_n.jpg",
   "./textures/grass.jpg",

@@ -1,0 +1,14 @@
+[
+ {"name": "tread", "seamless": true, "w": 1024, "h": 1024, "seed": 52001, "steps": 22,
+  "prompt": "Seamless flat texture map of the tread of a large black off-road mud-terrain tyre, unrolled flat and photographed straight on at exactly 90 degrees, orthographic, uniform scale with no perspective: big chunky interlocking rubber tread blocks with deep voids, stone ejectors and siping, repeating evenly across the entire image, light grey desert dust packed into the grooves. Flat even light, no rim, no background, no gradient, no text."},
+ {"name": "sidewall", "seamless": true, "w": 1024, "h": 1024, "seed": 52002, "steps": 22,
+  "prompt": "Seamless flat texture map of black off-road tyre sidewall rubber, photographed straight on at exactly 90 degrees, orthographic, uniform across the entire image: matte black rubber with fine moulded micro texture, subtle radial ribs and scuffs, light tan dust settled in the texture. Flat even light, no text, no letters, no numbers, no rim, no gradient."},
+ {"name": "mud", "seamless": true, "w": 1024, "h": 1024, "seed": 52003, "steps": 22,
+  "prompt": "Seamless flat texture map of dried mud splatter and desert dust spray on a clean white surface, photographed straight on at exactly 90 degrees, orthographic, uniform across the entire image: irregular brown and tan mud droplets of many sizes, streaks, fine dust speckles, lots of clean white surface between them. Flat even light, no gradient, no objects, no text."},
+ {"name": "grille", "seamless": true, "w": 1024, "h": 1024, "seed": 52004, "steps": 22,
+  "prompt": "Seamless flat texture map of a black hexagonal honeycomb metal grille mesh, photographed straight on at exactly 90 degrees, orthographic, uniform pattern across the entire image: matte black powder coated steel, small hexagon cells, slight dust on the edges, pure darkness behind the holes. Flat even light, no logo, no frame, no gradient."},
+ {"name": "plastic", "seamless": true, "w": 1024, "h": 1024, "seed": 52005, "steps": 22,
+  "prompt": "Seamless flat texture map of weathered black textured automotive plastic trim, photographed straight on at exactly 90 degrees, orthographic, uniform across the entire image: pebbled grain ABS plastic, slightly faded to charcoal grey by the sun, fine scratches and a light coat of tan dust. Flat even light, no gradient, no text."},
+ {"name": "chassis", "seamless": true, "w": 1024, "h": 1024, "seed": 52006, "steps": 22,
+  "prompt": "Seamless flat texture map of a dirty truck chassis underside, photographed straight on at exactly 90 degrees, orthographic, uniform across the entire image: black crinkle-coat painted steel covered with caked dry mud, dust and small gravel chips, scraped bare metal in a few spots. Flat even light, no gradient, no text."}
+]
