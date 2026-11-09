@@ -71,7 +71,7 @@ def lower_bottom(z):
 def lower_top(z):
     if z >= 1.20:                      # hood: falls gently to the nose
         t = (z - 1.20) / (ZN - 1.20)
-        return 1.36 - 0.035 * t - 0.055 * t ** 3
+        return 1.36 - 0.012 * t - 0.022 * t ** 3     # nearly flat: a tall, blunt modern nose
     return 1.36
 def lower_half(z):
     return HW - 0.028 * sstep(2.15, ZN, z)
@@ -236,32 +236,42 @@ for s in (1, -1):
     D.quad("glass", (gx0, 1.39, 0.877), (gx1, 1.39, 0.877), (gx1, 1.65, 0.877), (gx0, 1.65, 0.877),
            outward_from=(s * (HW + 0.175), 1.52, 2.0))
 
-# ---- front end ----
-D.rbox("grille", (0, 0.95, NOSE + 0.035), (1.16, 0.34, 0.05), r=0.02)
-for i in range(4):
-    D.box("silver", (0, 0.83 + i * 0.08, NOSE + 0.065), (1.10, 0.024, 0.03))
+# ---- front end: modern face ----
+# A big black grille in a thick frame, slim headlights swept back into the
+# wings with amber light-guide strips, a wide steel bumper with round fogs,
+# and a tubular grille guard.
+D.rbox("trim", (0, 1.035, ZN + 0.012), (1.22, 0.47, 0.06), r=0.045)              # grille frame
+D.rbox("grille", (0, 1.035, ZN + 0.035), (1.08, 0.35, 0.03), r=0.02)             # grille insert
+for y in (0.965, 1.105):
+    D.rbox("trim", (0, y, ZN + 0.052), (1.06, 0.034, 0.03), r=0.01)              # bars
 for s in (1, -1):
-    D.rbox("trim", (s * 0.78, 1.04, NOSE + 0.04), (0.32, 0.18, 0.05), r=0.02)
-    D.box("lampWhite", (s * 0.78, 1.065, NOSE + 0.07), (0.27, 0.075, 0.02))
-    D.box("lampWhite", (s * 0.78, 0.99, NOSE + 0.068), (0.19, 0.045, 0.02))
-    D.box("lampAmber", (s * 0.78, 0.92, NOSE + 0.066), (0.27, 0.028, 0.02))
-D.rbox("paint", (0, 1.37, 1.95), (0.70, 0.06, 0.95), r=0.028)                       # power dome
-D.box("trim", (0, 1.372, 2.40), (0.52, 0.035, 0.07))                       # low scoop above the grille
-D.box("grille", (0, 1.376, 2.437), (0.48, 0.022, 0.005))
+    hx = s * 0.775
+    D.rbox("grille", (hx, 1.180, ZN + 0.004), (0.34, 0.165, 0.05), r=0.035)              # housing
+    D.rbox("grille", (s * 0.925, 1.175, ZN - 0.10), (0.05, 0.15, 0.20), r=0.02)          # wraps the corner
+    for dx in (-0.075, 0.040):                                                            # projectors
+        x = hx + s * dx
+        D.cyl("chrome", (x, 1.195, ZN + 0.026), 0.050, 0.050, 0.012, segs=18, axis='Z')
+        D.cyl("lampWhite", (x, 1.195, ZN + 0.034), 0.036, 0.036, 0.012, segs=18, axis='Z')
+    D.box("lampDrl", (hx + s * 0.01, 1.118, ZN + 0.031), (0.30, 0.020, 0.012))          # amber "C": bottom,
+    D.box("lampDrl", (hx - s * 0.150, 1.170, ZN + 0.031), (0.020, 0.10, 0.012))          # inner edge,
+    D.box("lampDrl", (s * 0.952, 1.130, ZN - 0.09), (0.012, 0.020, 0.16))               # and the side return
+# wide steel bumper, wings swept up toward the wheels
+D.rbox("metal", (0, 0.70, BUMP_F - 0.10), (1.78, 0.27, 0.24), r=0.045)
+D.rbox("metal", (0, 0.86, BUMP_F - 0.16), (1.30, 0.06, 0.14), r=0.02)             # upper step
 for s in (1, -1):
-    for i in range(4):
-        D.box("trim", (s * 0.52, 1.335, 2.12 - i * 0.07), (0.18, 0.012, 0.025))
-# high-clearance steel bumper, wings swept up toward the wheels
-D.rbox("metal", (0, 0.68, BUMP_F - 0.10), (1.42, 0.24, 0.20), r=0.035)
+    D.rbox("metal", (s * 0.94, 0.78, BUMP_F - 0.26), (0.36, 0.22, 0.18), r=0.035, rot=(-0.22, s * 0.62, 0))
+    D.cyl("trim", (s * 0.66, 0.70, BUMP_F + 0.024), 0.052, 0.052, 0.02, segs=18, axis='Z')   # fog bezel
+    D.cyl("lampDrl", (s * 0.66, 0.70, BUMP_F + 0.032), 0.036, 0.036, 0.02, segs=18, axis='Z')
+    dring(D, (s * 0.36, 0.55, BUMP_F + 0.02))                                  # red shackles
+# grille guard: a light hoop framing the grille, and a nudge bar across the bumper
+GZ = BUMP_F + 0.02
 for s in (1, -1):
-    D.rbox("metal", (s * 0.88, 0.76, BUMP_F - 0.22), (0.40, 0.20, 0.18), r=0.03, rot=(-0.22, s * 0.62, 0))
-    D.box("lampAmber", (s * 0.84, 0.78, BUMP_F - 0.115), (0.075, 0.075, 0.02))   # cube fog lights
-    D.box("trim", (s * 0.84, 0.78, BUMP_F - 0.13), (0.095, 0.095, 0.02))
-    dring(D, (s * 0.42, 0.57, BUMP_F + 0.02))                                  # red shackles
-D.rbox("trim", (0, 0.68, BUMP_F + 0.005), (0.50, 0.15, 0.04), r=0.015)                   # winch cradle
-D.box("red", (0, 0.68, BUMP_F + 0.03), (0.17, 0.05, 0.015))                    # hawse fairlead
-D.box("trim", (0, 0.60, BUMP_F + 0.05), (0.035, 0.07, 0.025))                  # hook
-D.rbox("metal", (0, 0.42, 2.38), (1.00, 0.03, 0.62), r=0.012, rot=(0.20, 0, 0))          # skid plate
+    tube(D, "metal", (s * 0.56, 0.84, GZ), (s * 0.56, 1.20, GZ - 0.07), 0.027)
+    tube(D, "metal", (s * 0.56, 1.20, GZ - 0.07), (s * 0.48, 1.27, GZ - 0.09), 0.027)
+    tube(D, "metal", (s * 0.56, 0.93, GZ + 0.01), (s * 0.82, 0.90, GZ - 0.13), 0.027)
+tube(D, "metal", (-0.49, 1.27, GZ - 0.09), (0.49, 1.27, GZ - 0.09), 0.027)
+tube(D, "metal", (-0.56, 0.93, GZ + 0.01), (0.56, 0.93, GZ + 0.01), 0.030)
+D.rbox("metal", (0, 0.45, 2.42), (0.90, 0.03, 0.46), r=0.012, rot=(0.30, 0, 0))          # skid plate
 
 # ---- flares with exposed bolts ----
 def bolts(path, x, step=4):
@@ -324,11 +334,15 @@ for s in (1, -1):
 tube(D, "trim", (-0.84, HT, HZ), (0.84, HT, HZ), 0.032)
 D.rbox("trim", (0, HT + 0.04, HZ + 0.01), (0.80, 0.07, 0.05), r=0.018)
 D.box("lampWhite", (0, HT + 0.04, HZ - 0.016), (0.74, 0.045, 0.004))
-# recovery boards (orange), standing against the left wall
-for k in range(2):
-    D.box("orange", (HW - 0.12 - k * 0.05, 1.33, -2.05), (0.04, 0.34, 1.05))
-    for z in (-1.70, -2.05, -2.40):
-        D.box("orange", (HW - 0.12 - k * 0.05 - 0.015, 1.33, z), (0.012, 0.30, 0.04))
+# recovery boards (orange), standing upright on the chase rack, one each side
+for s in (1, -1):
+    x = s * (HW - 0.045)
+    D.rbox("orange", (x, 1.70, -1.47), (0.035, 0.34, 0.92), r=0.012, rot=(0.10, 0, 0))
+    for zz in range(7):                                       # traction nubs
+        for yy in (-0.09, 0.0, 0.09):
+            D.box("orange", (x + s * 0.024, 1.70 + yy - (zz - 3) * 0.013 * 0, -1.10 - zz * 0.12 + yy * 0.10), (0.014, 0.035, 0.05), rot=(0.10, 0, 0))
+    for z in (-1.20, -1.75):                                  # mounting brackets
+        D.box("trim", (x - s * 0.03, 1.70, z), (0.05, 0.05, 0.04))
 # two 20 L jerry cans (red)
 for z in (-1.18, -1.40):
     D.rbox("red", (-0.66, BF + 0.24, z), (0.17, 0.46, 0.33), r=0.03)
@@ -374,8 +388,10 @@ for s in (1, -1):
         D.box("trim", (s * 0.76, ROOF + 0.04, z), (0.03, 0.07, 0.03))
 for z in (0.30, -0.18, -0.68):
     tube(D, "trim", (-0.76, RT, z), (0.76, RT, z), 0.014)
-D.rbox("trim", (0, RT + 0.02, 0.37), (1.06, 0.06, 0.07), r=0.02)
-D.box("lampWhite", (0, RT + 0.02, 0.406), (1.00, 0.03, 0.004))
+D.rbox("trim", (0, RT + 0.03, 0.37), (1.10, 0.085, 0.08), r=0.02)
+D.box("grille", (0, RT + 0.03, 0.408), (1.04, 0.06, 0.004))
+for i in range(16):                                            # 16 LED cells
+    D.box("lampBar", (-0.4875 + i * 0.065, RT + 0.03, 0.412), (0.05, 0.045, 0.006))
 
 # ---- snorkel up the -X A-pillar ----
 sx = -(HW + 0.045)

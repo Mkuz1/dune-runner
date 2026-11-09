@@ -1,5 +1,12 @@
 # Textured truck — Blender + Draw Things pipeline
 
+> **Not used by the current truck.** Since the restyle to match the app icon
+> (modern front, grille guard, amber DRLs, black wheels), the shipped
+> `models/pickup6x6.glb` is generated headlessly from `../p6_geom.py` and has
+> no UVs, so the game skips these textures and uses its plain materials with
+> vertex-colour grime. To bring photo textures back, rebuild and re-bake the
+> new geometry with the steps below and restore `models/truck/`.
+
 The game's truck (`models/pickup6x6.glb` + `models/truck/*.jpg`) is the
 p6_geom model, finished in Blender with baked photo textures:
 

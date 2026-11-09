@@ -37,3 +37,4 @@ node_modules/
 test-results/
 playwright-report/
 tools/icon/full-bleed.png
+__pycache__/

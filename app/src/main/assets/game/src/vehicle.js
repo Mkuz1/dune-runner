@@ -543,10 +543,14 @@ export class Vehicle {
 
     // keys this.M does not have yet (rim gunmetal, gold bolts, red shackles…)
     const extra = {
-      gunmetal: { color: 0x4a4e52, metalness: 0.85, roughness: 0.38, envMapIntensity: 1.2 },
-      gold:     { color: 0xc8a050, metalness: 1.0, roughness: 0.32, envMapIntensity: 1.3 },
+      // satin-black wheels with dark hardware, as on the app icon
+      gunmetal: { color: 0x1c1e21, metalness: 0.5, roughness: 0.5, envMapIntensity: 1.0 },
+      gold:     { color: 0x3a3c40, metalness: 0.8, roughness: 0.4, envMapIntensity: 1.0 },
+      // amber light-guide strips in the headlights and fogs, and the LED roof bar
+      lampDrl:  { color: 0xff9a3c, emissive: 0xff7a12, emissiveIntensity: 1.6, roughness: 0.2, metalness: 0 },
+      lampBar:  { color: 0xffd8a0, emissive: 0xffa640, emissiveIntensity: 0.7, roughness: 0.2, metalness: 0 },
       red:      { color: 0xa01a12, metalness: 0.35, roughness: 0.38 },
-      orange:   { color: 0xf26a0c, metalness: 0.0, roughness: 0.55 },
+      orange:   { color: 0xff5a00, metalness: 0.0, roughness: 0.6 },
       yellow:   { color: 0xe8b80e, metalness: 0.0, roughness: 0.6 },
       chassis:  { color: 0x101113, metalness: 0.2, roughness: 0.82 }
     };
@@ -569,7 +573,7 @@ export class Vehicle {
     this.M.trim.color.set(0x1a1c1e); this.M.trim.roughness = 0.68;      // pebbled ABS
     this.M.metal.color.set(0x111213); this.M.metal.metalness = 0.2;      // crinkle-coat steel
     this.M.metal.roughness = 0.55;
-    this.M.rubber.color.set(0x242526); this.M.rubber.roughness = 0.84;   // aged rubber, not black
+    this.M.rubber.color.set(0x2b2420); this.M.rubber.roughness = 0.9;    // warm, dusty mud-terrain rubber
 
     /* Baked texture sets (modelled and baked in Blender, surface detail
        from Draw Things): colour, tangent-space normal, and occlusion /
@@ -577,7 +581,13 @@ export class Vehicle {
        part's meshes get their own copy of the tuned game
        material with those maps attached, so paint keeps its clear coat and
        glass stays glass. Missing textures leave the plain materials. */
-    const tex = await this.loadPartTextures();
+    /* Baked textures only fit a model that was UV-unwrapped in Blender. The
+       current body is generated straight from tools/pickup6x6/p6_geom.py
+       (no UVs), so skip the twelve image requests when there is nothing to
+       put them on; the vertex-colour grime and shader dust take over. */
+    let hasUV = false;
+    root.traverse(o => { if (o.isMesh && o.geometry.attributes.uv) hasUV = true; });
+    const tex = hasUV ? await this.loadPartTextures() : null;
     const NO_MAPS = new Set(['glass', 'tint', 'lampWhite', 'lampRed', 'lampAmber']);
     const partOf = (o) => {
       for (let p = o; p; p = p.parent) {
@@ -650,8 +660,8 @@ export class Vehicle {
     // lamps and glows to the new front, roof bar and tail
     const NOSE = 2.70;
     if (this.headlights.length >= 2) {
-      this.headlights[0].position.set(-0.78, 1.05, NOSE);
-      this.headlights[1].position.set(0.78, 1.05, NOSE);
+      this.headlights[0].position.set(-0.775, 1.19, NOSE);
+      this.headlights[1].position.set(0.775, 1.19, NOSE);
       this.headlights[0].target.position.set(-0.95, -0.2, 28);
       this.headlights[1].target.position.set(0.95, -0.2, 28);
       if (this.barLight) {
@@ -660,9 +670,9 @@ export class Vehicle {
       }
     }
     if (this.glowFront) {
-      this.glowFront[0].position.set(-0.78, 1.05, NOSE + 0.05);
-      this.glowFront[1].position.set(0.78, 1.05, NOSE + 0.05);
-      this.glowBar.position.set(0, 2.0, 0.45);
+      this.glowFront[0].position.set(-0.775, 1.19, NOSE + 0.05);
+      this.glowFront[1].position.set(0.775, 1.19, NOSE + 0.05);
+      this.glowBar.position.set(0, 2.005, 0.45);
       this.glowBar.scale.set(2.2, 2.2, 1);
       this.glowRear[0].position.set(-0.90, 1.27, -2.99);
       this.glowRear[1].position.set(0.90, 1.27, -2.99);
@@ -720,9 +730,9 @@ export class Vehicle {
     };
     // how much each surface collects: tyres and chassis the most
     const amount = {
-      paint: 1.0, roof: 1.0, trim: 0.9, grille: 0.8, metal: 1.0, chassis: 1.1,
-      rubber: 0.5, gunmetal: 1.0, silver: 0.9, red: 1.0, orange: 1.0, yellow: 1.0,
-      chrome: 0.6, gold: 0.8
+      paint: 1.0, roof: 1.0, trim: 0.5, grille: 0.4, metal: 0.45, chassis: 1.1,
+      rubber: 0.35, gunmetal: 0.4, silver: 0.9, red: 1.0, orange: 0.3, yellow: 1.0,
+      chrome: 0.6, gold: 0.5
     };
     // the paint: a little less blinding, and more of the sky in it
     this.M.paint.color.set(0xdde1e3);
@@ -805,6 +815,9 @@ export class Vehicle {
     this.M.lampWhite.emissiveIntensity = on ? 2.6 : 0.06;
     this.M.lampRed.emissiveIntensity = 0.25 + brake * 3.2 + (on ? 0.6 : 0);
     this.M.lampAmber.emissiveIntensity = on ? 0.9 : 0.12;
+    // daytime running lights stay lit; the roof bar always shows a warm glow
+    if (this.M.lampDrl) this.M.lampDrl.emissiveIntensity = on ? 2.6 : 1.6;
+    if (this.M.lampBar) this.M.lampBar.emissiveIntensity = on ? 3.2 : 0.7;
     if (this.glowFront) {
       const o = on ? 0.95 : 0.0;
       this.glowFront[0].material.opacity = o;
