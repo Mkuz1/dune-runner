@@ -65,10 +65,45 @@ function gpuString() {
   } catch (_) { return ''; }
 }
 
+function isPhoneDevice() {
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  return /Android|iPhone|iPod/i.test(navigator.userAgent) ||
+    (coarse && Math.min(innerWidth, innerHeight) < 500);
+}
+
+/* A phone that picks Ultra or High in the menu still gets the desktop
+   preset's look, but not its desktop-only costs. Uncapped, Ultra on a
+   phone was rendering 169 terrain chunks into a 4096² soft shadow map at
+   2x pixel ratio, through SMAA's three extra full-screen passes, while
+   re-placing 11,000 grass tufts every 5 m on the main thread — a few
+   frames a second, at best. These caps keep the higher tiers visibly
+   better than Medium (more chunks, sharper textures, bloom, clutter)
+   while keeping the frame inside a phone's budget. */
+const PHONE_CAPS = {
+  ultra: { viewRadius: 5, nearRes: 144, texSize: 768, shadowSize: 2048, shadowExtent: 90,
+           shadowRing: 1, grassCount: 4200, grassRadius: 62, maxPixelRatio: 1.5 },
+  high:  { viewRadius: 4, nearRes: 128, texSize: 768, shadowSize: 2048, shadowExtent: 84,
+           shadowRing: 1, grassCount: 3400, grassRadius: 54, maxPixelRatio: 1.5 },
+  med:   { maxPixelRatio: 1.5 },
+  low:   {}
+};
+
+function forPhone(q) {
+  const cap = PHONE_CAPS[q.tier] || {};
+  for (const k in cap) q[k] = Math.min(q[k], cap[k]);
+  q.smaa = false;            // three full-screen passes; MSAA is skipped too
+  q.softShadows = false;     // PCF instead of PCFSoft: a third of the taps
+  q.isPhone = true;
+  q.fov += 4;
+  return q;
+}
+
 export function detectQuality(override) {
-  if (override && PRESETS[override]) return { ...PRESETS[override], chosen: true };
-  const saved = loadSettings().quality;
-  if (saved && PRESETS[saved]) return { ...PRESETS[saved], chosen: true };
+  const pick = PRESETS[override] ? override : loadSettings().quality;
+  if (pick && PRESETS[pick]) {
+    const q = { ...PRESETS[pick], chosen: true };
+    return isPhoneDevice() ? forPhone(q) : q;
+  }
 
   const ua = navigator.userAgent;
   const gpu = gpuString();
@@ -91,9 +126,7 @@ export function detectQuality(override) {
 
   const q = { ...PRESETS[tier] };
   q.gpu = gpu;
-  q.isPhone = isPhone;
-  if (isPhone) q.fov += 4;
-  return q;
+  return isPhone ? forPhone(q) : q;
 }
 
 export function presetList() {
@@ -122,14 +155,17 @@ export class QualityGovernor {
     const median = sorted[sorted.length >> 1];
     this.fps = 1 / median;
 
-    // a hand-picked preset is respected: only the render scale is nudged
-    const floor = this.q.chosen ? 0.75 : 0.62;
+    /* A hand-picked preset is respected on desktop: only the render scale
+       is nudged. On a phone a smooth frame matters more than holding the
+       exact look, so the governor may go further there. */
+    const strict = this.q.chosen && !this.q.isPhone;
+    const floor = strict ? 0.75 : 0.62;
     const base = Math.min(this.q.maxPixelRatio, devicePixelRatio || 1);
     if (this.fps < 38 && this.scale > floor) {
       this.scale = Math.max(floor, this.scale - 0.12);
       this.apply(base, composer);
       this.dropped++;
-    } else if (this.fps < 28 && this.dropped >= 3 && this.q.bloom && !this.q.chosen) {
+    } else if (this.fps < 28 && this.dropped >= 3 && this.q.bloom && !strict) {
       this.q.bloom = false;                       // last resort
       if (composer) composer.setBloom(false);
       this.cool = 4;

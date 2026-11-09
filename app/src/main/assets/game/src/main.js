@@ -69,7 +69,7 @@ class Game {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = this.q.shadows;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = this.q.softShadows === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     renderer.info.autoReset = true;
     this.renderer = renderer;
 
@@ -237,7 +237,10 @@ class Game {
        Flying covers ground three to five times quicker than driving, and a
        chunk that has not been built yet is a hole in the world — much more
        noticeable than the couple of milliseconds this costs. */
-    const streamBudget = (this.q.tier === 'low' ? 4.5 : 7) + Math.min(9, phys.speed * 0.13);
+    const streamBudget = this.q.isPhone
+      // a phone has ~16 ms for everything; 16 ms of streaming alone was a slideshow
+      ? 2.5 + Math.min(4, phys.speed * 0.06)
+      : (this.q.tier === 'low' ? 4.5 : 7) + Math.min(9, phys.speed * 0.13);
     this.terrain.update(phys.pos.x, phys.pos.z, streamBudget);
     this.hf.update(phys.pos.x, phys.pos.z, 1.6);
     this.grass.update(dt, phys.pos.x, phys.pos.z);
