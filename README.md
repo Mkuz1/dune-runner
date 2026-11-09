@@ -15,9 +15,10 @@ make a permanent release. Add the Cloudflare secrets described at the top of
 the workflow and the website redeploys on every push too.
 
 **In-app updates:** each build of `main` is also published, signed, to the
-public repo [dune-runner-releases](https://github.com/mohamdbeam-star/dune-runner-releases)
-together with a `version.json`. Both apps read that file when they start
-(and when they come back to the front, at most every six hours):
+public repo [dune-runner-releases](https://github.com/Mkuz1/dune-runner-releases)
+together with a `version.json`. The apps and the website read that file when
+they start (and when they come back to the front, at most once an hour on the
+apps, every 30 minutes on the website):
 
 - **Android** shows *Update available*, downloads the APK with a progress bar
   and hands it to the system installer. Updates install over the old copy
@@ -26,6 +27,18 @@ together with a `version.json`. Both apps read that file when they start
 - **iPhone / iPad** can't install apps itself, so it offers *Install with
   AltStore / SideStore* when either is installed, or downloads the `.ipa` and
   opens the share sheet (Save to Files, AirDrop to the Mac running Sideloadly).
+- **Website** shows a *new version available* bar with an *Update now* button
+  that reloads into the new build (`src/updates.js`).
+
+The start screen shows the running version. CI writes it into
+`app/src/main/assets/game/build.json` for every platform; a local checkout
+says *Development build*.
+
+The releases repo must be **public** (the apps read it without logging in)
+and needs a deploy key with write access whose private half is the
+`RELEASES_DEPLOY_KEY` secret. To publish somewhere else, set the repository
+variable `RELEASES_REPO` and change the URL in `Updater.java`,
+`Updater.swift` and `src/updates.js`.
 
 Versions come from the workflow run number (`versionCode` = run + 10,
 `versionName` = 1.2.run). One-time setup of the CI secrets: `./set-ci-secrets.sh`.

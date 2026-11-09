@@ -14,7 +14,7 @@
 # copies can never be updated again (they would have to be reinstalled).
 set -euo pipefail
 cd "$(dirname "$0")"
-REPO=mohamdbeam-star/dune-runner
+REPO=Mkuz1/dune-runner
 
 for f in dune-runner-release.jks keystore.properties releases_deploy_key; do
   [ -f "$f" ] || { echo "Missing $f"; exit 1; }
@@ -30,4 +30,4 @@ gh secret set RELEASES_DEPLOY_KEY --repo "$REPO" < releases_deploy_key
 echo
 gh secret list --repo "$REPO"
 echo
-echo "Done. The next push to main will publish to https://github.com/mohamdbeam-star/dune-runner-releases"
+echo "Done. The next push to main will publish to https://github.com/Mkuz1/dune-runner-releases"

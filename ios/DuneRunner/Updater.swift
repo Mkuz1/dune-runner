@@ -1,7 +1,7 @@
 // Updater.swift — "a new build is out" for the sideloaded iPhone/iPad app.
 //
 // CI publishes every build of main to the public repo
-// mohamdbeam-star/dune-runner-releases, next to a small version.json. This
+// Mkuz1/dune-runner-releases, next to a small version.json. This
 // checks that file at launch (and when the app comes back to the front, at
 // most every six hours) and compares its versionCode with our CFBundleVersion.
 //
@@ -15,7 +15,7 @@ import UIKit
 
 final class Updater: NSObject, URLSessionDownloadDelegate {
     static let versionURL = URL(string:
-        "https://raw.githubusercontent.com/mohamdbeam-star/dune-runner-releases/main/version.json")!
+        "https://raw.githubusercontent.com/Mkuz1/dune-runner-releases/main/version.json")!
 
     struct Remote: Decodable {
         let versionCode: Int
@@ -45,7 +45,7 @@ final class Updater: NSObject, URLSessionDownloadDelegate {
     }
 
     func checkIfDue() {
-        if let last = lastCheck, Date().timeIntervalSince(last) < 6 * 3600 { return }
+        if let last = lastCheck, Date().timeIntervalSince(last) < 3600 { return }
         check()
     }
 

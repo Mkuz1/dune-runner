@@ -34,8 +34,8 @@ import java.util.Locale;
  * In-app updates for the sideloaded APK.
  *
  * CI publishes every build of main to the public repo
- * mohamdbeam-star/dune-runner-releases, next to a small version.json. At
- * launch (and on resume, at most every six hours) this reads that file and,
+ * Mkuz1/dune-runner-releases, next to a small version.json. At
+ * launch (and on resume, at most once an hour) this reads that file and,
  * if its versionCode is higher than ours, offers the update. Accepting
  * downloads the APK with a progress bar and hands it to the system package
  * installer, which shows its usual "update this app?" confirmation.
@@ -48,9 +48,9 @@ final class Updater {
 
     private static final String TAG = "DuneRunnerUpdater";
     private static final String VERSION_URL =
-            "https://raw.githubusercontent.com/mohamdbeam-star/dune-runner-releases/main/version.json";
-    private static final String PAGE_URL = "https://github.com/mohamdbeam-star/dune-runner-releases";
-    private static final long RECHECK_MS = 6L * 3600 * 1000;
+            "https://raw.githubusercontent.com/Mkuz1/dune-runner-releases/main/version.json";
+    private static final String PAGE_URL = "https://github.com/Mkuz1/dune-runner-releases";
+    private static final long RECHECK_MS = 1L * 3600 * 1000;    // launch, then on resume at most hourly
 
     private final Activity act;
     private final Handler ui = new Handler(Looper.getMainLooper());

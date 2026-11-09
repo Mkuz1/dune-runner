@@ -15,7 +15,7 @@
        when CACHE is bumped, and they are the bulk of the bytes.
 
    Bump CACHE on every deploy. */
-const CACHE = 'dune-runner-v12';
+const CACHE = 'dune-runner-v13';
 const ASSETS = [
   "./",
   "./index.html",
@@ -42,6 +42,8 @@ const ASSETS = [
   "./src/village.js",
   "./src/diag.js",
   "./src/world.js",
+  "./src/updates.js",
+  "./build.json",
   "./libs/three/three.module.js",
   "./libs/three/addons/objects/Sky.js",
   "./libs/three/addons/loaders/GLTFLoader.js",
@@ -126,6 +128,7 @@ self.addEventListener('fetch', (e) => {
   const isCode = url.pathname.endsWith('.html')
               || url.pathname.endsWith('.css')
               || url.pathname.includes('/src/')
+              || url.pathname.endsWith('/build.json')
               || url.pathname === '/' || url.pathname.endsWith('/');
 
   if (isCode) {

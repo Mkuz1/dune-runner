@@ -26,6 +26,7 @@
     <div class="boot-bar"><i id="bootFill"></i></div>
     <div id="bootMsg" class="boot-msg">Warming up the engine…</div>
     <button id="startBtn" class="start-btn" hidden>START ENGINE</button>
+    <div id="bootVer" class="boot-ver">&nbsp;</div>
     <div class="boot-tips" id="bootTips">
       <div><b>W A S D</b> / arrows — drive &amp; steer</div>
       <div><b>F</b> — toggle flight mode &nbsp;·&nbsp; <b>SPACE</b> — climb higher</div>
@@ -175,6 +176,7 @@
     }
   }, 9000);
 </script>
+<script type="module" src="./src/updates.js"></script>
 <script type="module" src="./src/main.js"></script>
 <script nomodule>
   document.getElementById('bootMsg').textContent =
