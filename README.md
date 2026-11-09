@@ -15,7 +15,7 @@ make a permanent release. Add the Cloudflare secrets described at the top of
 the workflow and the website redeploys on every push too.
 
 **In-app updates:** each build of `main` is also published, signed, to the
-public repo [dune-runner-releases](https://github.com/Mkuz1/dune-runner-releases)
+public repo [dune-runner-release](https://github.com/Mkuz1/dune-runner-release)
 together with a `version.json`. The apps and the website read that file when
 they start (and when they come back to the front, at most once an hour on the
 apps, every 30 minutes on the website):

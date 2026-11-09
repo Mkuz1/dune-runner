@@ -127,7 +127,7 @@ test.describe('F12 URL options', () => {
 
 test.describe('F13 update feed', () => {
   test('F13-H1 version.json is valid and its downloads exist', async ({ request }) => {
-    const base = 'https://raw.githubusercontent.com/mohamdbeam-star/dune-runner-releases/main/';
+    const base = 'https://raw.githubusercontent.com/Mkuz1/dune-runner-release/main/';
     const v = await (await request.get(base + 'version.json')).json();
     expect(Number.isInteger(v.versionCode)).toBe(true);
     expect(v.versionName).toMatch(/^\d+\.\d+\.\d+$/);

@@ -9,14 +9,14 @@
 #   ANDROID_KEY_PASSWORD     -> signed release APK + AAB for Google Play
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID -> deploy the website
 #   RELEASES_DEPLOY_KEY      -> SSH key with write access to the public repo
-#                               <owner>/dune-runner-releases; pushes
+#                               <owner>/dune-runner-release; pushes
 #                               to main publish the signed APK + IPA there with
 #                               the version.json the in-app updater reads
 # Optional repository variable:
 #   CF_PAGES_PROJECT         -> Cloudflare Pages project name (default: fjmk)
 #   RELEASES_REPO            -> where updates are published (default:
-#                               <owner>/dune-runner-releases). The apps and the
-#                               website read version.json from Mkuz1/dune-runner-releases
+#                               <owner>/dune-runner-release). The apps and the
+#                               website read version.json from Mkuz1/dune-runner-release
 #                               (Updater.java, Updater.swift, src/updates.js).
 #
 # Versions: versionCode / CFBundleVersion = run number + 10, versionName =
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_KEY: ${{ secrets.RELEASES_DEPLOY_KEY }}
-      RELEASES_REPO: ${{ vars.RELEASES_REPO || format('{0}/dune-runner-releases', github.repository_owner) }}
+      RELEASES_REPO: ${{ vars.RELEASES_REPO || format('{0}/dune-runner-release', github.repository_owner) }}
       NOTES: ${{ github.event.head_commit.message }}
     steps:
       - uses: actions/download-artifact@v4
@@ -160,7 +160,7 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: Publish to dune-runner-releases
+      - name: Publish to dune-runner-release
         if: env.DEPLOY_KEY != ''
         run: |
           if [ ! -f dist/DuneRunner-release.apk ]; then

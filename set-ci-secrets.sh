@@ -5,7 +5,7 @@
 #                                                     with the same key, so
 #                                                     installed copies can update
 #   releases_deploy_key                            -> lets CI push builds to the
-#                                                     public dune-runner-releases repo
+#                                                     public dune-runner-release repo
 #
 # All three files live only on this machine and are git-ignored. This script
 # contains no secrets; it reads those files and stores them as encrypted
@@ -30,4 +30,4 @@ gh secret set RELEASES_DEPLOY_KEY --repo "$REPO" < releases_deploy_key
 echo
 gh secret list --repo "$REPO"
 echo
-echo "Done. The next push to main will publish to https://github.com/Mkuz1/dune-runner-releases"
+echo "Done. The next push to main will publish to https://github.com/Mkuz1/dune-runner-release"

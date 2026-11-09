@@ -13,7 +13,7 @@
 ------------------------------------------------------------------ */
 
 export const UPDATE_URL =
-  'https://raw.githubusercontent.com/Mkuz1/dune-runner-releases/main/version.json';
+  'https://raw.githubusercontent.com/Mkuz1/dune-runner-release/main/version.json';
 const RECHECK_MS = 30 * 60 * 1000;
 
 const inApp = location.hostname === 'appassets.androidplatform.net' || location.protocol === 'app:';

@@ -58,7 +58,7 @@ for the game's own files, and (where marked) axe accessibility violations.
 | F11-N1 | no WebGL | negative | launch Chromium with WebGL disabled | friendly "WebGL" error screen, no crash loop | e2e | pass |
 | F12-H1 | URL options | happy | `?q=low`, `?seed=1337` | Low tier; same seed spawns at the same place twice | e2e | pass |
 | F12-N1 | | negative: junk params | `?q=bogus&seed=abc` | falls back to auto tier, boots | e2e | pass |
-| F13-H1 | in-app update feed | happy | fetch `version.json` from dune-runner-releases | valid JSON, APK and IPA URLs reachable, sizes match | e2e | pass |
+| F13-H1 | in-app update feed | happy | fetch `version.json` from dune-runner-release | valid JSON, APK and IPA URLs reachable, sizes match | e2e | pass |
 | F13-M1 | | manual: Android update | install 1.2.7, open, accept update | download progress, system installer, app reopens on 1.2.8 | manual | not run: needs a real device |
 | F13-M2 | | manual: iOS update | install 1.2.7 IPA, open | "Update available" with AltStore/SideStore or Download .ipa → share sheet | manual | not run: needs a real device |
 | F13-M3 | | manual: offline launch | airplane mode, open the app | no update prompt, no error, game runs | manual | not run: needs a real device |
