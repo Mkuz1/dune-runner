@@ -36,3 +36,4 @@ releases_deploy_key.pub
 node_modules/
 test-results/
 playwright-report/
+tools/icon/full-bleed.png
