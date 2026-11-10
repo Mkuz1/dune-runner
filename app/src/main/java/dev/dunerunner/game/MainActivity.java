@@ -94,10 +94,12 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web.setBackgroundColor(Color.parseColor("#05080b"));
         web.setFitsSystemWindows(false);
-        /* No setLayerType(LAYER_TYPE_HARDWARE) here: on a WebView that redraws
-           every frame it adds a full-screen offscreen copy per frame, which on a
-           large tablet costs more than the game's own post-processing. The
-           window is hardware-accelerated already. */
+        /* Keep the WebView in its own hardware layer. Without it, an Honor
+           tablet (MagicOS 10) showed the start screen doubled and offset with
+           a white unpainted block after closing and reopening the app — the
+           compositor presenting stale and missing tiles. The layer costs one
+           full-screen copy per frame, which is a small price for that. */
+        web.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.setVerticalScrollBarEnabled(false);
         web.setHorizontalScrollBarEnabled(false);

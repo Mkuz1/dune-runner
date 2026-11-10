@@ -232,9 +232,28 @@ class Game {
     requestAnimationFrame(this.loop);
   }
 
+  /* Frame-rate cap. 'auto' locks phones and tablets to an even 30 fps once
+     they show they cannot hold ~50: a steady 30 feels smoother than a
+     ragged 38-45 on a 90/120 Hz screen, and the device runs cooler, so it
+     is not thermally throttled a few minutes in. Desktop stays uncapped. */
+  frameCap() {
+    const pref = this.settings ? this.settings.fps : 'auto';
+    if (pref === '30') return 30;
+    if (pref === '60') return 60;
+    return this.autoCap || 0;
+  }
+
   loop = (now) => {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
+
+    const cap = this.frameCap();
+    if (cap) {
+      // skip this vsync if the next frame is not due yet (2 ms of slack
+      // so a 60 Hz screen does not drop to 20 when capped at 30)
+      const interval = 1000 / cap;
+      if (now - this.last < interval - 2) return;
+    }
 
     let dt = (now - this.last) / 1000;
     this.last = now;
@@ -292,7 +311,14 @@ class Game {
     /* ---- fx, audio, hud ---- */
     this.fx.update(dt, phys, this.vehicle, this.camera, this.env);
     this.audio.update(dt, phys, input);
+    this.gov.target = this.frameCap() || 60;
     this.gov.update(rdt, this.post);
+    // auto: phones/tablets that cannot sustain ~50 fps get a steady 30
+    if (this.q.isPhone && !this.autoCap && this.gov.fps > 0) {
+      if (this.gov.fps >= 50) this.slowSince = 0;
+      else if (!this.slowSince) this.slowSince = now;
+      else if (now - this.slowSince > 3000) this.autoCap = 30;
+    }
     this.hud.update(dt, phys, this.env, this.chase.modeName, this.gov.fps);
 
     this.post.render(dt);

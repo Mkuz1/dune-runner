@@ -11,6 +11,7 @@ export class Settings {
     const s = loadSettings();
     this.muted = s.muted === true;
     this.volume = typeof s.volume === 'number' ? s.volume : 0.55;
+    this.fps = ['auto', '30', '60'].includes(s.fps) ? s.fps : 'auto';
 
     this.btnSound = document.getElementById('btnSound');
     this.btnGfx = document.getElementById('btnGfx');
@@ -29,6 +30,17 @@ export class Settings {
       b.addEventListener('click', () => this.setQuality(p.key));
       this.gfxSeg.appendChild(b);
     }
+
+    /* frame-rate buttons */
+    this.fpsSeg = document.getElementById('fpsSeg');
+    if (this.fpsSeg) this.fpsSeg.querySelectorAll('[data-fps]').forEach(b => {
+      b.addEventListener('click', () => {
+        this.fps = b.dataset.fps;
+        saveSettings({ fps: this.fps });
+        this.refresh();
+        this.flash(this.fps === 'auto' ? 'Frame rate: automatic' : `Frame rate: ${this.fps} fps`);
+      });
+    });
 
     /* sound buttons */
     this.sndSeg.querySelectorAll('[data-snd]').forEach(b => {
@@ -123,7 +135,7 @@ export class Settings {
       `v${b.versionName || '?'} · ${g.q.tier}${g.q.isPhone ? ' (mobile)' : ''}\n` +
       `${gpu}\n` +
       `${w}×${h} px · scale ${(g.gov ? g.gov.scale : 1).toFixed(2)} · ${g.gov && g.gov.fps ? Math.round(g.gov.fps) : '…'} fps` +
-      `${g.q.bloom ? '' : ' · no bloom'}${g.shaderErrors && g.shaderErrors.length ? ' · shader errors: ' + g.shaderErrors.length : ''}` +
+      `${g.frameCap && g.frameCap() ? ' · capped ' + g.frameCap() : ''}${g.q.bloom ? '' : ' · no bloom'}${g.shaderErrors && g.shaderErrors.length ? ' · shader errors: ' + g.shaderErrors.length : ''}` +
       `${g.vehicle && g.vehicle.modelLoaded ? '' : ' · truck model missing'}`;
   }
 
@@ -137,6 +149,9 @@ export class Settings {
     this.btnSound.setAttribute('aria-label', this.muted ? 'Unmute' : 'Mute');
     this.sndSeg.querySelectorAll('[data-snd]').forEach(b => {
       b.classList.toggle('on', (b.dataset.snd === 'off') === this.muted);
+    });
+    if (this.fpsSeg) this.fpsSeg.querySelectorAll('[data-fps]').forEach(b => {
+      b.classList.toggle('on', b.dataset.fps === this.fps);
     });
     this.gfxSeg.querySelectorAll('[data-q]').forEach(b => {
       b.classList.toggle('on', b.dataset.q === this.game.q.tier);

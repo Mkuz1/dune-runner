@@ -93,6 +93,7 @@ function forPhone(q) {
   for (const k in cap) q[k] = Math.min(q[k], cap[k]);
   q.smaa = false;            // three full-screen passes; MSAA is skipped too
   if (q.tier === 'low') q.shadows = false;   // a second scene pass; the truck keeps its blob shadow
+  if (q.tier === 'med') q.bloom = false;     // bloom is ~6 full-screen passes; keep it for High/Ultra
   q.softShadows = false;     // PCF instead of PCFSoft: a third of the taps
   q.isPhone = true;
   q.fov += 4;
@@ -187,7 +188,8 @@ export class QualityGovernor {
     this.samples.push(dt);
     this.window += dt;
     this.cool -= dt;
-    if (this.window < 1.2 || this.samples.length < 8) return;
+    // normally 1.2 s and 8 frames; a very slow device decides after 3 s anyway
+    if (this.window < 1.2 || this.samples.length < 2 || (this.samples.length < 8 && this.window < 3)) return;
 
     const sorted = [...this.samples].sort((a, b) => a - b);
     this.fps = 1 / sorted[sorted.length >> 1];
@@ -216,10 +218,11 @@ export class QualityGovernor {
       }
     }
 
-    if (this.fps < 40 && this.scale > floor && !this.notFillBound) {
+    const T = this.target || 60;            // 30 when the frame rate is capped
+    if (this.fps < T * 0.66 && this.scale > floor && !this.notFillBound) {
       this.probe = { fps: this.fps, scale: this.scale };
       // the slower it is, the bigger the step
-      const step = this.fps < 20 ? 0.25 : 0.12;
+      const step = this.fps < T * 0.33 ? 0.25 : 0.12;
       this.scale = Math.max(floor, this.scale - step);
       this.apply(base, composer);
       this.dropped++;
@@ -227,11 +230,11 @@ export class QualityGovernor {
       this.lastMove = -1;
       this.goodWindows = 0;
       this.cool = 1.5;
-    } else if (this.fps < 30 && this.q.bloom && !strict) {
+    } else if (this.fps < T * 0.5 && this.q.bloom && !strict) {
       this.q.bloom = false;                       // last resort
       if (composer) composer.setBloom(false);
       this.cool = 3;
-    } else if (this.fps > 57 && this.scale < 1 && this.bounces < 2) {
+    } else if (this.fps > T * 0.95 && this.scale < 1 && this.bounces < 2) {
       if (++this.goodWindows >= 3) {              // ~4 s of real headroom
         this.scale = Math.min(1, this.scale + 0.08);
         this.apply(base, composer);
