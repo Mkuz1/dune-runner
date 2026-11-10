@@ -145,13 +145,13 @@ export function makePineCards(seed, detail) {
 
   // trunk with a slight lean, and a root flare
   const lean = new THREE.Vector3((rnd() - 0.5) * 0.12, 1, (rnd() - 0.5) * 0.12).normalize();
-  bark.push(limb(0.36, 0.06, h, detail ? 9 : 6, new THREE.Vector3(0, -0.2, 0), lean, 0x4a3524, rnd));
-  const flare = new THREE.ConeGeometry(0.7, 1.0, detail ? 9 : 6, 1);
+  bark.push(limb(0.36, 0.06, h, detail > 0 ? 9 : 6, new THREE.Vector3(0, -0.2, 0), lean, 0x4a3524, rnd));
+  const flare = new THREE.ConeGeometry(0.7, 1.0, detail > 0 ? 9 : 6, 1);
   flare.translate(0, 0.35, 0);
   bark.push(paint(flare, 0x453120, 0.12, rnd));
 
   const crownBase = h * (0.16 + rnd() * 0.08);
-  const whorls = detail ? 18 : 11;
+  const whorls = detail > 0 ? 18 : detail < 0 ? 7 : 11;
   const axisAt = (y) => lean.clone().multiplyScalar(y / lean.y);
 
   // shading normal: out from the trunk axis and a little up
@@ -169,7 +169,7 @@ export function makePineCards(seed, detail) {
     const t = i / (whorls - 1);
     const y = crownBase + (h - crownBase - 0.6) * Math.pow(t, 0.9);
     const reach = (3.2 - 2.75 * t) * (0.85 + rnd() * 0.3);
-    const n = Math.max(3, Math.round((detail ? 7 : 5) - t * 3 + rnd()));
+    const n = Math.max(3, Math.round((detail > 0 ? 7 : detail < 0 ? 4 : 5) - t * 3 + rnd()));
     const ax = axisAt(y);
     const lightLevel = 0.62 + 0.38 * t;               // lower whorls sit in shade
 
@@ -181,17 +181,17 @@ export function makePineCards(seed, detail) {
       const from = ax.clone().add(new THREE.Vector3(0, y - ax.y, 0));
 
       // a visible branch near the trunk where the needles thin out
-      if (detail && t < 0.7 && rnd() < 0.55) {
+      if (detail > 0 && t < 0.7 && rnd() < 0.55) {
         bark.push(limb(0.06, 0.02, L * 0.55, 4, from, dir, 0x3e2c1d, rnd));
       }
 
       // two or three twig cards along the branch, each a V of two
-      const segs = L > 2.2 ? 3 : L > 1.2 ? 2 : 1;
+      const segs = detail < 0 ? (L > 1.8 ? 2 : 1) : L > 2.2 ? 3 : L > 1.2 ? 2 : 1;
       for (let s = 0; s < segs; s++) {
         const start = s === 0 ? 0.05 : s / segs - 0.08;
         const base = from.clone().addScaledVector(dir, L * start);
         const len = L * (s === 0 ? 0.72 : 0.6) * (0.9 + rnd() * 0.2);
-        const rect = TWIGS[(b + s + i) % (detail ? 4 : 2)];
+        const rect = TWIGS[(b + s + i) % (detail > 0 ? 4 : 2)];
         const wid = len * aspect(rect) * 1.05;
         const lit = lightLevel * (0.82 + 0.18 * (start + 0.5));
         for (const roll of [0.55, -0.55]) {
@@ -253,9 +253,9 @@ export function makeBirchCards(seed, detail) {
   const h = 8.5 + rnd() * 4;
   const bark = [];
   const cards = new Cards();
-  const per = detail ? 60 : 30;
+  const per = detail > 0 ? 60 : detail < 0 ? 14 : 30;
 
-  bark.push(limb(0.30, 0.10, h * 0.8, detail ? 8 : 6, new THREE.Vector3(0, -0.2, 0), UP, 0x9a9384, rnd));
+  bark.push(limb(0.30, 0.10, h * 0.8, detail > 0 ? 8 : 6, new THREE.Vector3(0, -0.2, 0), UP, 0x9a9384, rnd));
 
   const limbs = 5 + Math.floor(rnd() * 2);
   for (let i = 0; i < limbs; i++) {
@@ -279,7 +279,7 @@ export function makeAcaciaCards(seed, detail) {
   const h = 4.6 + rnd() * 2.4;
   const bark = [];
   const cards = new Cards();
-  const per = detail ? 80 : 40;
+  const per = detail > 0 ? 80 : detail < 0 ? 18 : 40;
 
   bark.push(limb(0.40, 0.17, h * 0.8, 6, new THREE.Vector3(0, -0.2, 0), UP, 0x59452e, rnd));
   for (let i = 0; i < 3; i++) {
@@ -305,7 +305,7 @@ export function makeBushCards(seed, dry, detail) {
   for (let i = 0; i < blobs; i++) {
     const r = 0.55 + rnd() * 0.65;
     const c = new THREE.Vector3((rnd() - 0.5) * 1.5, r * 0.72 + rnd() * 0.3, (rnd() - 0.5) * 1.5);
-    cluster(cards, rnd, c, r, 0.82, detail ? 26 : 14, 0.5 + r * 0.25, 0.2, tint);
+    cluster(cards, rnd, c, r, 0.82, detail > 0 ? 26 : detail < 0 ? 7 : 14, 0.5 + r * 0.25, 0.2, tint);
   }
   return { multi: [[cards.geometry(), 'leafCardMat']] };
 }

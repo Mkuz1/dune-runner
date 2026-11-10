@@ -473,7 +473,11 @@ class ChunkJob {
   scatter(rec) {
     const t = this.t;
     const lib = t.props;
-    const density = this.ring <= 1 ? 1.0 : this.ring === 2 ? 0.62 : 0.34;
+    /* Phones and tablets: about half the plants, and the small stuff (bushes,
+       rocks, driftwood) only in the chunk you are in — from the next chunk
+       out they are a few pixels each but still cost full geometry. */
+    const mobile = !!t.q.isPhone;
+    const density = (this.ring <= 1 ? 1.0 : this.ring === 2 ? 0.62 : 0.34) * (mobile ? (this.ring === 0 ? 0.55 : 0.30) : 1);
     const step = 19;
     const wx0 = this.cx * CHUNK, wz0 = this.cz * CHUNK;
     const g0 = Math.ceil(wx0 / step), g1 = Math.floor(((this.cx + 1) * CHUNK - 0.001) / step);
@@ -542,6 +546,7 @@ class ChunkJob {
           else if (r3 < 0.93) { kind = 'rock'; scale = 0.24 + r1 * 0.95; }
         }
         if (!kind) continue;
+        if (mobile && this.ring >= 1 && (kind === 'bush' || kind === 'rock' || kind === 'wood') && r1 > 0.35) continue;
         if (kind !== 'rock' && flat < 0.62) continue;
 
         pos.set(wx, h - 0.25 * scale, wz);

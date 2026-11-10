@@ -80,11 +80,11 @@ function isPhoneDevice() {
    better than Medium (more chunks, sharper textures, bloom, clutter)
    while keeping the frame inside a phone's budget. */
 const PHONE_CAPS = {
-  ultra: { viewRadius: 5, nearRes: 144, texSize: 768, shadowSize: 2048, shadowExtent: 90,
-           shadowRing: 1, grassCount: 4200, grassRadius: 62, maxPixelRatio: 1.5 },
-  high:  { viewRadius: 4, nearRes: 128, texSize: 768, shadowSize: 2048, shadowExtent: 84,
-           shadowRing: 1, grassCount: 3400, grassRadius: 54, maxPixelRatio: 1.5 },
-  med:   { maxPixelRatio: 1.5 },
+  ultra: { viewRadius: 4, nearRes: 112, texSize: 768, shadowSize: 2048, shadowExtent: 80,
+           shadowRing: 0, treeRing: 2, grassCount: 3000, grassRadius: 54, maxPixelRatio: 1.5 },
+  high:  { viewRadius: 4, nearRes: 96, texSize: 768, shadowSize: 1536, shadowExtent: 76,
+           shadowRing: 0, treeRing: 2, grassCount: 2400, grassRadius: 48, maxPixelRatio: 1.5 },
+  med:   { nearRes: 96, treeRing: 1, grassCount: 2000, maxPixelRatio: 1.5 },
   low:   {}
 };
 
@@ -176,6 +176,8 @@ export class QualityGovernor {
     this.goodWindows = 0;
     this.lastMove = 0;
     this.fps = 0;            // 0 = not measured yet
+    this.probe = null;       // { fps, scale } before the last drop
+    this.notFillBound = false;
   }
 
   update(dt, composer) {
@@ -194,10 +196,25 @@ export class QualityGovernor {
        is nudged. On a phone a smooth frame matters more than holding the
        exact look, so the governor may go further there. */
     const strict = this.q.chosen && !this.q.isPhone;
-    const floor = strict ? 0.75 : (this.q.isPhone ? 0.55 : 0.62);
+    const floor = strict ? 0.75 : (this.q.isPhone ? 0.70 : 0.62);
     const base = basePixelRatio(this.q);
 
-    if (this.fps < 40 && this.scale > floor) {
+    /* Did the last drop help? If the frame rate barely moved, this device is
+       limited by geometry or the CPU, not by pixels: lowering the resolution
+       further only makes it blurry. Put the resolution back and stop. */
+    if (this.probe) {
+      const p = this.probe; this.probe = null;
+      if (this.fps < p.fps * 1.08) {
+        this.scale = p.scale;
+        this.apply(base, composer);
+        this.notFillBound = true;
+        this.cool = 1.5;
+        return;
+      }
+    }
+
+    if (this.fps < 40 && this.scale > floor && !this.notFillBound) {
+      this.probe = { fps: this.fps, scale: this.scale };
       // the slower it is, the bigger the step
       const step = this.fps < 20 ? 0.25 : 0.12;
       this.scale = Math.max(floor, this.scale - step);

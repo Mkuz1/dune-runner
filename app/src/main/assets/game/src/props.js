@@ -69,10 +69,10 @@ export function makePine(seed = 7, detail = 1) {
   const rnd = makeRandom(seed);
   const parts = [];
   const h = 10 + rnd() * 7;
-  const seg = detail > 0 ? 9 : 6;
+  const seg = detail > 0 ? 9 : detail < 0 ? 5 : 6;
 
   // trunk, visibly tapered, with a slight lean
-  const trunk = new THREE.CylinderGeometry(0.10, 0.40, h * 0.96, seg, 3);
+  const trunk = new THREE.CylinderGeometry(0.10, 0.40, h * 0.96, seg, detail < 0 ? 1 : 3);
   const tp = trunk.attributes.position;
   const lean = (rnd() - 0.5) * 0.10;
   for (let i = 0; i < tp.count; i++) {
@@ -87,13 +87,13 @@ export function makePine(seed = 7, detail = 1) {
   flare.translate(0, 0.42, 0);
   parts.push(paint(flare, 0x453120, 0.12, rnd));
 
-  const tiers = detail > 0 ? 8 : 5;
+  const tiers = detail > 0 ? 8 : detail < 0 ? 4 : 5;
   let y = h * 0.20;
   for (let i = 0; i < tiers; i++) {
     const t = i / (tiers - 1);
     const r = (3.1 - t * 2.45) * (0.88 + rnd() * 0.3);
     const ch = 3.0 - t * 0.9;
-    const cone = new THREE.ConeGeometry(r, ch, detail > 0 ? 9 : 6, 2);
+    const cone = new THREE.ConeGeometry(r, ch, seg, detail < 0 ? 1 : 2);
 
     // droop the skirt of each tier so the branches hang
     const p = cone.attributes.position;
@@ -131,21 +131,21 @@ export function makePine(seed = 7, detail = 1) {
 /* --------------------------------------------------------------- BIRCH
    A broadleaf with a real forked branch structure, for variety in the
    mixed woodland. */
-export function makeBirch(seed = 101) {
+export function makeBirch(seed = 101, lite = false) {
   const rnd = makeRandom(seed);
   const parts = [];
   const h = 7.5 + rnd() * 4;
 
-  const trunk = new THREE.CylinderGeometry(0.13, 0.32, h * 0.72, 7, 2);
+  const trunk = new THREE.CylinderGeometry(0.13, 0.32, h * 0.72, lite ? 5 : 7, lite ? 1 : 2);
   trunk.translate(0, h * 0.36, 0);
   parts.push(paint(trunk, 0x9a9384, 0.09, rnd));
 
-  const limbs = 4 + Math.floor(rnd() * 2);
+  const limbs = lite ? 3 : 4 + Math.floor(rnd() * 2);
   for (let i = 0; i < limbs; i++) {
     const a = (i / limbs) * 6.283 + rnd() * 0.7;
     const len = 2.2 + rnd() * 1.5;
     const tilt = 0.62 + rnd() * 0.35;
-    const br = new THREE.CylinderGeometry(0.05, 0.13, len, 5, 1);
+    const br = new THREE.CylinderGeometry(0.05, 0.13, len, lite ? 4 : 5, 1);
     br.translate(0, len * 0.5, 0);
     br.rotateZ(tilt);
     br.rotateY(a);
@@ -156,16 +156,16 @@ export function makeBirch(seed = 101) {
     const lx = Math.cos(a) * Math.sin(tilt) * len * 0.92;
     const lz = -Math.sin(a) * Math.sin(tilt) * len * 0.92;
     const ly = h * 0.62 + Math.cos(tilt) * len * 0.92 + 0.4;
-    for (let k = 0; k < 2; k++) {
-      const r = 1.25 + rnd() * 0.75;
-      const s = lumpy(new THREE.SphereGeometry(r, 9, 7), 0.34, 2.6, rnd);
+    for (let k = 0; k < (lite ? 1 : 2); k++) {
+      const r = (lite ? 1.55 : 1.25) + rnd() * 0.75;
+      const s = lumpy(new THREE.SphereGeometry(r, lite ? 6 : 9, lite ? 4 : 7), 0.34, 2.6, rnd);
       tr(s, lx + (rnd() - 0.5) * 1.1, ly + (rnd() - 0.5) * 0.9, lz + (rnd() - 0.5) * 1.1,
         0, 0, 0, 1, 0.78, 1);
       parts.push(paint(s, k % 2 ? 0x4f7a34 : 0x63913f, 0.19, rnd));
     }
   }
   // crown
-  const crown = lumpy(new THREE.SphereGeometry(1.7 + rnd() * 0.5, 10, 7), 0.32, 2.2, rnd);
+  const crown = lumpy(new THREE.SphereGeometry(1.7 + rnd() * 0.5, lite ? 7 : 10, lite ? 5 : 7), 0.32, 2.2, rnd);
   tr(crown, 0, h * 0.92, 0, 0, 0, 0, 1, 0.8, 1);
   parts.push(paint(crown, 0x58852f, 0.17, rnd));
 
@@ -175,7 +175,7 @@ export function makeBirch(seed = 101) {
 }
 
 /* -------------------------------------------------------------- ACACIA */
-export function makeAcacia(seed = 11) {
+export function makeAcacia(seed = 11, lite = false) {
   const rnd = makeRandom(seed);
   const parts = [];
   const h = 4.6 + rnd() * 2.4;
@@ -195,7 +195,7 @@ export function makeAcacia(seed = 11) {
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2 + 0.6;
     const r = 2.1 + rnd() * 0.9;
-    const cap = lumpy(new THREE.SphereGeometry(r, 9, 6), 0.30, 1.9, rnd);
+    const cap = lumpy(new THREE.SphereGeometry(r, lite ? 6 : 9, lite ? 4 : 6), 0.30, 1.9, rnd);
     tr(cap, Math.cos(a) * 1.5, h + 0.5 + rnd() * 0.3, Math.sin(a) * 1.5, 0, 0, 0, 1, 0.4, 1);
     parts.push(paint(cap, i % 2 ? 0x50692c : 0x5e7833, 0.15, rnd));
   }
@@ -205,30 +205,30 @@ export function makeAcacia(seed = 11) {
 }
 
 /* ---------------------------------------------------------------- PALM */
-export function makePalm(seed = 23) {
+export function makePalm(seed = 23, lite = false) {
   const rnd = makeRandom(seed);
   const parts = [];
   const h = 7 + rnd() * 4;
   const lean = 0.16 + rnd() * 0.18;
 
   // curved trunk built from stacked segments
-  const segs = 7;
+  const segs = lite ? 4 : 7;
   for (let i = 0; i < segs; i++) {
     const t = i / segs;
     const sh = h / segs;
-    const seg = new THREE.CylinderGeometry(0.20 - t * 0.07, 0.26 - t * 0.07, sh * 1.06, 6, 1);
+    const seg = new THREE.CylinderGeometry(0.20 - t * 0.07, 0.26 - t * 0.07, sh * 1.06, lite ? 5 : 6, 1);
     const bend = lean * t * t * h;
     tr(seg, bend, sh * (i + 0.5), 0, 0, 0, -lean * t * 0.9);
     parts.push(paint(seg, 0x6b563c, 0.14, rnd));
   }
 
   const topX = lean * h, topY = h;
-  const fronds = 9;
+  const fronds = lite ? 7 : 9;
   for (let i = 0; i < fronds; i++) {
     const a = (i / fronds) * Math.PI * 2 + rnd() * 0.3;
     const droop = 0.55 + rnd() * 0.5;
     const len = 3.4 + rnd() * 1.5;
-    const shape = new THREE.PlaneGeometry(len, 0.95, 4, 1);
+    const shape = new THREE.PlaneGeometry(len, 0.95, lite ? 2 : 4, 1);
     // taper + droop the frond
     const p = shape.attributes.position;
     for (let v = 0; v < p.count; v++) {
@@ -255,15 +255,15 @@ export function makePalm(seed = 23) {
 }
 
 /* -------------------------------------------------------------- CACTUS */
-export function makeCactus(seed = 31) {
+export function makeCactus(seed = 31, lite = false) {
   const rnd = makeRandom(seed);
   const parts = [];
   const h = 2.6 + rnd() * 2.6;
-  const body = new THREE.CylinderGeometry(0.34, 0.42, h, 9, 3);
+  const body = new THREE.CylinderGeometry(0.34, 0.42, h, lite ? 6 : 9, lite ? 1 : 3);
   body.translate(0, h * 0.5, 0);
   parts.push(paint(body, 0x3f6b3a, 0.1, rnd));
 
-  const cap = new THREE.SphereGeometry(0.34, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+  const cap = new THREE.SphereGeometry(0.34, lite ? 6 : 9, lite ? 2 : 5, 0, Math.PI * 2, 0, Math.PI / 2);
   cap.translate(0, h, 0);
   parts.push(paint(cap, 0x3f6b3a, 0.1, rnd));
 
@@ -272,10 +272,10 @@ export function makeCactus(seed = 31) {
     const a = rnd() * Math.PI * 2;
     const ay = h * (0.4 + rnd() * 0.25);
     const al = 1.0 + rnd() * 0.8;
-    const arm = new THREE.CylinderGeometry(0.2, 0.22, al, 7, 1);
+    const arm = new THREE.CylinderGeometry(0.2, 0.22, al, lite ? 5 : 7, 1);
     tr(arm, Math.cos(a) * 0.5, ay, Math.sin(a) * 0.5, 0, 0, Math.cos(a) * 1.2);
     parts.push(paint(arm, 0x3f6b3a, 0.1, rnd));
-    const up = new THREE.CylinderGeometry(0.19, 0.2, al * 0.9, 7, 1);
+    const up = new THREE.CylinderGeometry(0.19, 0.2, al * 0.9, lite ? 5 : 7, 1);
     up.translate(Math.cos(a) * (0.5 + al * 0.45), ay + al * 0.45, Math.sin(a) * (0.5 + al * 0.45));
     parts.push(paint(up, 0x3f6b3a, 0.1, rnd));
   }
@@ -285,13 +285,13 @@ export function makeCactus(seed = 31) {
 }
 
 /* ---------------------------------------------------------------- BUSH */
-export function makeBush(seed = 41, dry = false) {
+export function makeBush(seed = 41, dry = false, lite = false) {
   const rnd = makeRandom(seed);
   const parts = [];
-  const blobs = 4 + Math.floor(rnd() * 3);
+  const blobs = lite ? 3 : 4 + Math.floor(rnd() * 3);
   for (let i = 0; i < blobs; i++) {
-    const r = 0.5 + rnd() * 0.7;
-    const s = lumpy(new THREE.SphereGeometry(r, 8, 6), 0.38, 4.2, rnd);
+    const r = (lite ? 0.62 : 0.5) + rnd() * 0.7;
+    const s = lumpy(new THREE.SphereGeometry(r, lite ? 6 : 8, lite ? 4 : 6), 0.38, 4.2, rnd);
     tr(s, (rnd() - 0.5) * 1.5, r * 0.72 + rnd() * 0.4, (rnd() - 0.5) * 1.5, 0, 0, 0, 1, 0.82, 1);
     parts.push(paint(s, dry ? (i % 2 ? 0x6d6238 : 0x7d7145) : (i % 2 ? 0x2f5a2b : 0x3d6b33), 0.18, rnd));
   }
@@ -301,9 +301,9 @@ export function makeBush(seed = 41, dry = false) {
 }
 
 /* ---------------------------------------------------------------- ROCK */
-export function makeRock(seed = 53) {
+export function makeRock(seed = 53, lite = false) {
   const rnd = makeRandom(seed);
-  const g = new THREE.IcosahedronGeometry(1, 2);
+  const g = new THREE.IcosahedronGeometry(1, lite ? 1 : 2);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -458,7 +458,11 @@ function addDetail(mat, textures, kind) {
 
 /* ---------------------------------------------------------------------- */
 export function buildPropLibrary(textures, quality) {
-  const detail = quality && (quality.tier === 'ultra' || quality.tier === 'high') ? 1 : 0;
+  /* detail: 1 = full (high/ultra), 0 = standard, -1 = lite. Phones and
+     tablets always get the lite plants: an entry-level mobile GPU was
+     drawing 1.8 M triangles of vegetation per frame on Low, 13 M on Ultra. */
+  const lite = !!(quality && quality.isPhone);
+  const detail = lite ? -1 : quality && (quality.tier === 'ultra' || quality.tier === 'high') ? 1 : 0;
   const clock = { value: 0 };
 
   // rocks and logs: no wind
@@ -487,12 +491,12 @@ export function buildPropLibrary(textures, quality) {
   const lib = {
     mat, foliageMat, tuftMat, windClock: clock,
     pine: [makePine(7, detail), makePine(19, detail), makePine(88, detail), makePine(151, detail)],
-    birch: [makeBirch(101), makeBirch(211)],
-    acacia: [makeAcacia(11), makeAcacia(77)],
-    palm: [makePalm(23), makePalm(97)],
-    cactus: [makeCactus(31), makeCactus(131)],
-    bush: [makeBush(41, false), makeBush(43, true), makeBush(47, false)],
-    rock: [makeRock(53), makeRock(59), makeRock(67), makeRock(71)],
+    birch: [makeBirch(101, lite), makeBirch(211, lite)],
+    acacia: [makeAcacia(11, lite), makeAcacia(77, lite)],
+    palm: [makePalm(23, lite), makePalm(97, lite)],
+    cactus: [makeCactus(31, lite), makeCactus(131, lite)],
+    bush: [makeBush(41, false, lite), makeBush(43, true, lite), makeBush(47, false, lite)],
+    rock: [makeRock(53, lite), makeRock(59, lite), makeRock(67, lite), makeRock(71, lite)],
     wood: [makeDriftwood(61)],
     tuft: makeTuft()
   };
