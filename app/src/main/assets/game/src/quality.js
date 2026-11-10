@@ -93,7 +93,18 @@ function forPhone(q) {
   for (const k in cap) q[k] = Math.min(q[k], cap[k]);
   q.smaa = false;            // three full-screen passes; MSAA is skipped too
   if (q.tier === 'low') q.shadows = false;   // a second scene pass; the truck keeps its blob shadow
-  if (q.tier === 'med') q.bloom = false;     // bloom is ~6 full-screen passes; keep it for High/Ultra
+  if (q.tier === 'med') {
+    /* Measured on an Adreno 610 (Medium, 925x577): post-processing 12 ms,
+       shadows 5.5 ms of a 55 ms frame. Rendering straight to the canvas
+       (tone mapping still applies; only grain/vignette/sharpen go) and
+       dropping real-time shadows lets Medium hold 30 fps at full resolution
+       instead of the governor shrinking the picture. */
+    q.bloom = false;
+    q.finish = false;
+    q.shadows = false;
+  }
+  // smooth alpha-tested leaf and grass edges with the MSAA that mobile has on
+  q.alphaToCoverage = true;
   /* Mobile lighting. The on-device test on an Adreno 610 showed physically
      based shading was ~60% of the frame (88 ms -> 36 ms with simple
      lighting). So on phones and tablets: Lambert shading for ground, plants,

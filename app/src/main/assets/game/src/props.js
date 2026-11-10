@@ -511,9 +511,9 @@ export function buildPropLibrary(textures, quality) {
      loaded (every tier but low). Same seeds, so the forest keeps its mix. */
   if (textures.pineCards && textures.leafCards) {
     lib.pineCardMat = patchCardMaterial(addWind(
-      makeCardMaterial(textures.pineCards, textures.pineCardsA, !pbr), clock, 1.4, 0.7));
+      makeCardMaterial(textures.pineCards, textures.pineCardsA, !pbr, !!quality.alphaToCoverage), clock, 1.4, 0.7));
     lib.leafCardMat = patchCardMaterial(addWind(
-      makeCardMaterial(textures.leafCards, textures.leafCardsA, !pbr), clock, 1.4, 0.7));
+      makeCardMaterial(textures.leafCards, textures.leafCardsA, !pbr, !!quality.alphaToCoverage), clock, 1.4, 0.7));
     lib.pine = [7, 19, 88, 151].map(sd => makePineCards(sd, detail));
     lib.birch = [101, 211].map(sd => makeBirchCards(sd, detail));
     lib.acacia = [11, 77].map(sd => makeAcaciaCards(sd, detail));
