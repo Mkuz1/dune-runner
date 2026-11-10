@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace 'dev.dunerunner.game'
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId "dev.dunerunner.game"
         minSdk 24                 // Android 7.0 — the oldest with a reliably
-        targetSdk 34              // updatable WebView that supports WebGL 2
+        targetSdk 36              // updatable WebView that supports WebGL 2
         // CI passes -PversionCode / -PversionName (from the run number) so
         // every published build is newer than the last; the in-app updater
         // compares versionCode. Local builds default to 3 / 1.2.
