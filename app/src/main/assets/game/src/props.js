@@ -465,15 +465,18 @@ export function buildPropLibrary(textures, quality) {
   const detail = lite ? -1 : quality && (quality.tier === 'ultra' || quality.tier === 'high') ? 1 : 0;
   const clock = { value: 0 };
 
+  // mobile: matte Lambert shading (see quality.js, simpleLighting)
+  const Mat = quality && quality.simpleLighting ? THREE.MeshLambertMaterial : THREE.MeshStandardMaterial;
+  const pbr = Mat === THREE.MeshStandardMaterial;
   // rocks and logs: no wind
-  const mat = new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.9, metalness: 0.0,
-    side: THREE.DoubleSide, flatShading: false
+  const mat = new Mat({
+    vertexColors: true, side: THREE.DoubleSide, flatShading: false,
+    ...(pbr ? { roughness: 0.9, metalness: 0.0 } : {})
   });
   // everything that grows: wind
-  const foliageMat = addWind(new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.87, metalness: 0.0,
-    side: THREE.DoubleSide, flatShading: false
+  const foliageMat = addWind(new Mat({
+    vertexColors: true, side: THREE.DoubleSide, flatShading: false,
+    ...(pbr ? { roughness: 0.87, metalness: 0.0 } : {})
   }), clock, 1.4, 0.7);
 
   // photo surface detail: six to nine extra texture reads, so not on low
@@ -483,10 +486,10 @@ export function buildPropLibrary(textures, quality) {
     addDetail(foliageMat, textures, 'foliage');
   }
 
-  const tuftMat = addWind(new THREE.MeshStandardMaterial({
+  const tuftMat = addWind(new Mat({
     map: textures.tuft, transparent: false, alphaTest: 0.30,
-    side: THREE.DoubleSide, roughness: 1.0, metalness: 0,
-    color: 0xd7e3b4
+    side: THREE.DoubleSide, color: 0xd7e3b4,
+    ...(pbr ? { roughness: 1.0, metalness: 0 } : {})
   }), clock, 15.0, 0.0);
 
   const lib = {
@@ -508,9 +511,9 @@ export function buildPropLibrary(textures, quality) {
      loaded (every tier but low). Same seeds, so the forest keeps its mix. */
   if (textures.pineCards && textures.leafCards) {
     lib.pineCardMat = patchCardMaterial(addWind(
-      makeCardMaterial(textures.pineCards, textures.pineCardsA), clock, 1.4, 0.7));
+      makeCardMaterial(textures.pineCards, textures.pineCardsA, !pbr), clock, 1.4, 0.7));
     lib.leafCardMat = patchCardMaterial(addWind(
-      makeCardMaterial(textures.leafCards, textures.leafCardsA), clock, 1.4, 0.7));
+      makeCardMaterial(textures.leafCards, textures.leafCardsA, !pbr), clock, 1.4, 0.7));
     lib.pine = [7, 19, 88, 151].map(sd => makePineCards(sd, detail));
     lib.birch = [101, 211].map(sd => makeBirchCards(sd, detail));
     lib.acacia = [11, 77].map(sd => makeAcaciaCards(sd, detail));

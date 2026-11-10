@@ -94,6 +94,15 @@ function forPhone(q) {
   q.smaa = false;            // three full-screen passes; MSAA is skipped too
   if (q.tier === 'low') q.shadows = false;   // a second scene pass; the truck keeps its blob shadow
   if (q.tier === 'med') q.bloom = false;     // bloom is ~6 full-screen passes; keep it for High/Ultra
+  /* Mobile lighting. The on-device test on an Adreno 610 showed physically
+     based shading was ~60% of the frame (88 ms -> 36 ms with simple
+     lighting). So on phones and tablets: Lambert shading for ground, plants,
+     rocks and grass; no image-based sky reflections; no daytime-idle spot
+     lights (every pixel paid for the three headlight cones); no fill light.
+     The truck keeps its glossy paint. */
+  q.simpleLighting = true;
+  q.ibl = false;
+  q.headlights = false;
   q.softShadows = false;     // PCF instead of PCFSoft: a third of the taps
   q.isPhone = true;
   q.fov += 4;

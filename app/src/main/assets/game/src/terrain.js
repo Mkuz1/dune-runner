@@ -22,13 +22,23 @@ const SKIRT = 34;         // vertical apron hiding LOD seams
 /* ============================ MATERIAL ============================ */
 
 function makeTerrainMaterial(tex) {
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 1.0,
-    metalness: 0.0,
-    normalMap: tex.grassN,                       // enables the tangent frame
-    normalScale: new THREE.Vector2(1.15, 1.15)
-  });
+  /* Mobile uses Lambert: the ground is matte anyway, and physically based
+     shading was most of the frame on an entry-level tablet GPU. Lambert
+     still takes the normal map, so the ground keeps its relief. The
+     roughness patch below simply finds nothing to replace. */
+  const mat = tex.lite
+    ? new THREE.MeshLambertMaterial({
+        color: 0xffffff,
+        normalMap: tex.grassN,
+        normalScale: new THREE.Vector2(1.15, 1.15)
+      })
+    : new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1.0,
+        metalness: 0.0,
+        normalMap: tex.grassN,                       // enables the tangent frame
+        normalScale: new THREE.Vector2(1.15, 1.15)
+      });
 
   const one = new THREE.Vector3(1, 1, 1);
   const gain = tex.gain || {};

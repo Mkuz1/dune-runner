@@ -315,7 +315,13 @@ export function makeBushCards(seed, dry, detail) {
  * Alpha-tested, double-sided foliage. `addWind` (from props.js) is applied
  * first by the caller; this wraps it.
  */
-export function makeCardMaterial(colorTex, alphaTex) {
+export function makeCardMaterial(colorTex, alphaTex, simple = false) {
+  if (simple) {
+    return new THREE.MeshLambertMaterial({
+      map: colorTex, alphaMap: alphaTex, alphaTest: 0.5,
+      side: THREE.DoubleSide, vertexColors: true
+    });
+  }
   const mat = new THREE.MeshStandardMaterial({
     map: colorTex, alphaMap: alphaTex, alphaTest: 0.5,
     side: THREE.DoubleSide, vertexColors: true,

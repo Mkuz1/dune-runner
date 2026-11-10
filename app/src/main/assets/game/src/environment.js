@@ -199,7 +199,9 @@ export class Environment {
 
     this.fill = new THREE.DirectionalLight(0x8fb6de, 0.35);
     this.fill.position.set(-0.4, 0.5, -0.6);
-    scene.add(this.fill);
+    // mobile: one light fewer in every pixel; the hemisphere light takes its share
+    if (quality.simpleLighting) this.fill = null;
+    else scene.add(this.fill);
 
     /* ---------- fog ---------- */
     this.fogColor = new THREE.Color(0.72, 0.80, 0.88);
@@ -376,10 +378,11 @@ export class Environment {
     const sunI = clamp(smoothstep(-0.06, 0.22, up), 0, 1);
     this.sun.intensity = 0.25 + sunI * 5.4;
     this.sun.color.copy(this.sunColor);
-    this.hemi.intensity = 0.30 + sunI * 1.30;
+    // without sky reflections and the fill light, mobile gets more ambient
+    this.hemi.intensity = (0.30 + sunI * 1.30) * (this.q && this.q.simpleLighting ? 1.7 : 1);
     this.hemi.color.copy(this.skyHorizon).multiplyScalar(1.5);
     this.hemi.groundColor.setRGB(0.18 + sunI * 0.14, 0.15 + sunI * 0.12, 0.11 + sunI * 0.09);
-    this.fill.intensity = 0.10 + sunI * 0.42;
+    if (this.fill) this.fill.intensity = 0.10 + sunI * 0.42;
     this.exposure = 0.56 - sunI * 0.09 + this.night * 0.22;
 
     /* ---------------- shadow rig ----------------
@@ -469,6 +472,7 @@ export class Environment {
   }
 
   refreshEnv() {
+    if (this.q && this.q.ibl === false) return;     // mobile: no reflection probe
     const eu = this.envSky.material.uniforms;
     const su = this.sky.material.uniforms;
     eu.sunPosition.value.copy(su.sunPosition.value);
