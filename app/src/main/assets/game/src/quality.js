@@ -92,6 +92,7 @@ function forPhone(q) {
   const cap = PHONE_CAPS[q.tier] || {};
   for (const k in cap) q[k] = Math.min(q[k], cap[k]);
   q.smaa = false;            // three full-screen passes; MSAA is skipped too
+  if (q.tier === 'low') q.shadows = false;   // a second scene pass; the truck keeps its blob shadow
   q.softShadows = false;     // PCF instead of PCFSoft: a third of the taps
   q.isPhone = true;
   q.fov += 4;
@@ -133,52 +134,98 @@ export function presetList() {
   return ['ultra', 'high', 'med', 'low'].map(k => ({ key: k, label: PRESETS[k].label }));
 }
 
-/* ------------------------------------------------------------------ */
+/* Mobile resolution budget. Phones and tablets are limited by how many
+   pixels the GPU fills, not by the pixel ratio: a 2000-px-wide tablet at
+   1.35x was drawing almost as many pixels as a desktop. Each tier gets a
+   fixed number of drawn pixels instead, whatever the screen. */
+const PHONE_PIXELS = { low: 0.45e6, med: 0.65e6, high: 0.85e6, ultra: 1.05e6 };
+
+/** The pixel ratio to start at for this preset on this screen. */
+export function basePixelRatio(q) {
+  let pr = Math.min(q.maxPixelRatio, devicePixelRatio || 1);
+  const budget = q.isPhone && PHONE_PIXELS[q.tier];
+  if (budget) {
+    const css = Math.max(1, innerWidth * innerHeight);
+    pr = Math.min(pr, Math.sqrt(budget / css));
+  }
+  return Math.max(0.5, pr);
+}
+
+/* ------------------------------------------------------------------
+   Runtime governor. Watches the frame time and steps the render scale
+   (then bloom) down, or back up when there is headroom.
+
+   Decisions are made on elapsed time, not frame count: it used to wait
+   for 45 frames, which at 5 fps is nine seconds per step — on a slow
+   device it took over half a minute to recover. It also used to bounce
+   between two scales every two seconds (drop below 38 fps, climb back
+   above 56), and every change reallocates the post-processing buffers,
+   which shows as a flash. Raising now needs sustained headroom, and
+   stops for good once it has had to come back down twice.
+------------------------------------------------------------------ */
 export class QualityGovernor {
   constructor(renderer, quality) {
     this.renderer = renderer;
     this.q = quality;
     this.samples = [];
     this.scale = 1;
-    this.cool = 2.5;
+    this.cool = 2.0;
+    this.window = 0;
     this.dropped = 0;
-    this.fps = 60;
+    this.bounces = 0;
+    this.goodWindows = 0;
+    this.lastMove = 0;
+    this.fps = 0;            // 0 = not measured yet
   }
 
   update(dt, composer) {
     this.samples.push(dt);
-    if (this.samples.length > 60) this.samples.shift();
+    this.window += dt;
     this.cool -= dt;
-    if (this.samples.length < 45 || this.cool > 0) return;
+    if (this.window < 1.2 || this.samples.length < 8) return;
 
     const sorted = [...this.samples].sort((a, b) => a - b);
-    const median = sorted[sorted.length >> 1];
-    this.fps = 1 / median;
+    this.fps = 1 / sorted[sorted.length >> 1];
+    this.samples.length = 0;
+    this.window = 0;
+    if (this.cool > 0) return;
 
     /* A hand-picked preset is respected on desktop: only the render scale
        is nudged. On a phone a smooth frame matters more than holding the
        exact look, so the governor may go further there. */
     const strict = this.q.chosen && !this.q.isPhone;
-    const floor = strict ? 0.75 : 0.62;
-    const base = Math.min(this.q.maxPixelRatio, devicePixelRatio || 1);
-    if (this.fps < 38 && this.scale > floor) {
-      this.scale = Math.max(floor, this.scale - 0.12);
+    const floor = strict ? 0.75 : (this.q.isPhone ? 0.55 : 0.62);
+    const base = basePixelRatio(this.q);
+
+    if (this.fps < 40 && this.scale > floor) {
+      // the slower it is, the bigger the step
+      const step = this.fps < 20 ? 0.25 : 0.12;
+      this.scale = Math.max(floor, this.scale - step);
       this.apply(base, composer);
       this.dropped++;
-    } else if (this.fps < 28 && this.dropped >= 3 && this.q.bloom && !strict) {
+      if (this.lastMove > 0) this.bounces++;
+      this.lastMove = -1;
+      this.goodWindows = 0;
+      this.cool = 1.5;
+    } else if (this.fps < 30 && this.q.bloom && !strict) {
       this.q.bloom = false;                       // last resort
       if (composer) composer.setBloom(false);
-      this.cool = 4;
-    } else if (this.fps > 56 && this.scale < 1) {
-      this.scale = Math.min(1, this.scale + 0.08);
-      this.apply(base, composer);
+      this.cool = 3;
+    } else if (this.fps > 57 && this.scale < 1 && this.bounces < 2) {
+      if (++this.goodWindows >= 3) {              // ~4 s of real headroom
+        this.scale = Math.min(1, this.scale + 0.08);
+        this.apply(base, composer);
+        this.lastMove = 1;
+        this.goodWindows = 0;
+        this.cool = 2;
+      }
+    } else {
+      this.goodWindows = 0;
     }
-    this.cool = 2.0;
-    this.samples.length = 0;
   }
 
   apply(base, composer) {
-    const pr = Math.max(0.6, base * this.scale);
+    const pr = Math.max(0.45, base * this.scale);
     this.renderer.setPixelRatio(pr);
     if (composer) composer.resize();
   }

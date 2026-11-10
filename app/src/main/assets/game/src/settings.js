@@ -59,6 +59,7 @@ export class Settings {
   toggle(force) {
     const open = force === undefined ? this.panel.hidden : force;
     this.panel.hidden = !open;
+    if (open) this.showInfo();
     this.btnGfx.classList.toggle('active', open);
   }
 
@@ -77,6 +78,27 @@ export class Settings {
     const url = new URL(location.href);
     url.searchParams.delete('q');
     location.replace(url.toString());
+  }
+
+  /** Version, GPU and live numbers, for bug reports from real devices. */
+  showInfo() {
+    const el = document.getElementById('gfxInfo');
+    if (!el) return;
+    const g = this.game, r = g.renderer;
+    let gpu = '?';
+    try {
+      const gl = r.getContext();
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      gpu = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    } catch (_) {}
+    const b = window.__build || {};
+    const w = r.domElement.width, h = r.domElement.height;
+    el.textContent =
+      `v${b.versionName || '?'} · ${g.q.tier}${g.q.isPhone ? ' (mobile)' : ''}\n` +
+      `${gpu}\n` +
+      `${w}×${h} px · scale ${(g.gov ? g.gov.scale : 1).toFixed(2)} · ${g.gov && g.gov.fps ? Math.round(g.gov.fps) : '…'} fps` +
+      `${g.q.bloom ? '' : ' · no bloom'}${g.shaderErrors && g.shaderErrors.length ? ' · shader errors: ' + g.shaderErrors.length : ''}` +
+      `${g.vehicle && g.vehicle.modelLoaded ? '' : ' · truck model missing'}`;
   }
 
   apply() {

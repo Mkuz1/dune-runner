@@ -94,7 +94,10 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web.setBackgroundColor(Color.parseColor("#05080b"));
         web.setFitsSystemWindows(false);
-        web.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        /* No setLayerType(LAYER_TYPE_HARDWARE) here: on a WebView that redraws
+           every frame it adds a full-screen offscreen copy per frame, which on a
+           large tablet costs more than the game's own post-processing. The
+           window is hardware-accelerated already. */
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.setVerticalScrollBarEnabled(false);
         web.setHorizontalScrollBarEnabled(false);

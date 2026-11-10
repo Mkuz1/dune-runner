@@ -4,7 +4,7 @@
 
 import * as THREE from '../libs/three/three.module.js';
 
-import { detectQuality, QualityGovernor } from './quality.js';
+import { detectQuality, QualityGovernor, basePixelRatio } from './quality.js';
 import { buildTextures } from './textures.js';
 import { buildPropLibrary } from './props.js';
 import { Terrain, HeightField, CHUNK } from './terrain.js';
@@ -63,7 +63,7 @@ class Game {
     }
     if (!renderer.getContext()) { fatal(); return; }
 
-    renderer.setPixelRatio(Math.min(this.q.maxPixelRatio, devicePixelRatio || 1));
+    renderer.setPixelRatio(basePixelRatio(this.q));
     renderer.setSize(innerWidth, innerHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -72,6 +72,15 @@ class Game {
     renderer.shadowMap.type = this.q.softShadows === false ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     renderer.info.autoReset = true;
     this.renderer = renderer;
+    /* Record shader compile/link failures instead of only logging them, so a
+       device whose GPU driver rejects a shader can fall back (see below) and
+       the settings panel can report it. */
+    this.shaderErrors = [];
+    renderer.debug.onShaderError = (gl, program, vs, fs) => {
+      const log = (gl.getProgramInfoLog(program) || '') + (gl.getShaderInfoLog(fs) || '') + (gl.getShaderInfoLog(vs) || '');
+      this.shaderErrors.push(log.trim().slice(0, 300) || 'link failed');
+      console.error('shader error', log);
+    };
 
     renderer.domElement.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
@@ -154,6 +163,10 @@ class Game {
     // one warm-up frame so the first real frame is not a stutter
     this.phys.applyTo(this.vehicle);
     this.post.render(0.016);
+    // a shader that failed to build: drop the truck's dust shader and retry
+    if (this.shaderErrors.length && this.vehicle.removeGrime()) {
+      this.post.render(0.016);
+    }
 
     setProgress(1, 'Ready');
     startBtn.hidden = false;

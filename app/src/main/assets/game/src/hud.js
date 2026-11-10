@@ -219,7 +219,7 @@ export class Hud {
       const hh = String(Math.floor(t)).padStart(2, '0');
       const mm = String(Math.floor((t % 1) * 60)).padStart(2, '0');
       this.el.clock.textContent = `${hh}:${mm}`;
-      this.el.fps.textContent = `${Math.round(fps)} fps`;
+      this.el.fps.textContent = fps > 0 ? `${Math.round(fps)} fps` : '… fps';
     }
 
     this.frames++;

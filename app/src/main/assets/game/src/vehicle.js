@@ -722,7 +722,10 @@ export class Vehicle {
      level), so the dirt stays put however the truck tilts or flies. */
   addGrime() {
     const tex = this.textures;
-    if (!tex || !tex.dirt || (this.q && this.q.tier === 'low')) return;
+    /* Not on phones and tablets: the model already carries baked grime as
+       vertex colours, and this shader variant is the likeliest thing for a
+       mobile GPU driver to reject — which leaves the truck invisible. */
+    if (!tex || !tex.dirt || (this.q && (this.q.tier === 'low' || this.q.isPhone))) return;
     const U = this.grimeU = {
       uBodyInv: { value: new THREE.Matrix4() },
       tGrime: { value: tex.dirt },
@@ -795,6 +798,21 @@ export class Vehicle {
       m.customProgramCacheKey = () => (prevKey ? prevKey.call(m) : '') + '_grime' + key;
       m.needsUpdate = true;
     }
+  }
+
+  /** Undo addGrime (used if a device's GPU driver rejects the shader). */
+  removeGrime() {
+    if (!this.grimeU) return false;
+    for (const key in this.M) {
+      const m = this.M[key];
+      if (!m || !m.userData.grime) continue;
+      m.userData.grime = false;
+      m.onBeforeCompile = () => {};
+      m.customProgramCacheKey = () => 'nogrime' + key;
+      m.needsUpdate = true;
+    }
+    this.grimeU = null;
+    return true;
   }
 
   /** Wheel visual state. `compression` is how far the strut is pushed up. */

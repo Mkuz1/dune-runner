@@ -488,3 +488,6 @@ body.touch .sub{font-size:10px}
   background:linear-gradient(180deg,#ffc069,var(--accent));
 }
 #updateBar button.later{background:transparent;color:#9fb2c2;padding:8px 10px}
+
+/* device line in the settings panel: what to send when reporting a problem */
+.panel-info{margin-top:8px;font:10.5px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#8fa3b5;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text}
