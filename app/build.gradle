@@ -35,6 +35,18 @@ android {
         }
     }
 
+    /* Two distributions of the same game:
+         github — the sideloaded APK on Mkuz1/dune-runner-release, with the
+                  in-app updater (src/github).
+         play   — the Google Play bundle. Play forbids self-updating, so it
+                  gets a no-op Updater and no INTERNET/install permissions
+                  (src/play). Build it with ./gradlew bundlePlayRelease. */
+    flavorDimensions = ['store']
+    productFlavors {
+        github { dimension 'store' }
+        play { dimension 'store' }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix ".debug"

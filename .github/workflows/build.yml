@@ -73,16 +73,17 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon \
             -PversionCode=$((GITHUB_RUN_NUMBER + 10)) -PversionName="1.2.$GITHUB_RUN_NUMBER" \
-            assembleDebug assembleRelease bundleRelease
+            assembleGithubDebug assembleGithubRelease bundlePlayRelease
       - name: Collect
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/*.apk out/DuneRunner-debug.apk
+          cp app/build/outputs/apk/github/debug/*.apk out/DuneRunner-debug.apk
           if [ -n "$KS_B64" ]; then
-            cp app/build/outputs/apk/release/*.apk out/DuneRunner-release.apk
-            cp app/build/outputs/bundle/release/*.aab out/DuneRunner-release.aab
+            cp app/build/outputs/apk/github/release/*.apk out/DuneRunner-release.apk
+            # Google Play bundle: no self-updater (see app/src/play)
+            cp app/build/outputs/bundle/playRelease/*.aab out/DuneRunner-play.aab
           else
-            cp app/build/outputs/apk/release/*.apk out/DuneRunner-release-unsigned.apk
+            cp app/build/outputs/apk/github/release/*.apk out/DuneRunner-release-unsigned.apk
           fi
           rm -f release.jks keystore.properties
           ls -la out
@@ -223,7 +224,8 @@ jobs:
           NOTES="Built from ${GITHUB_SHA::7}.
 
           - DuneRunner-debug.apk: install directly on any Android phone (allow installs from unknown sources).
-          - DuneRunner-release*.apk / .aab: release build (signed when the keystore secrets are set; .aab is what Google Play takes).
+          - DuneRunner-release*.apk: sideload build with the in-app updater (signed when the keystore secrets are set).
+          - DuneRunner-play.aab: Google Play bundle, no self-updater.
           - DuneRunner-unsigned.ipa: iPhone/iPad build. Apple requires signing before it will install: use Xcode, Sideloadly or AltStore with your Apple ID, or TestFlight with a developer account.
           - DuneRunner-web.zip: the website build for Cloudflare Pages."
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then

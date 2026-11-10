@@ -65,7 +65,7 @@ isn't there, release builds simply come out unsigned instead of failing.
 Then:
 
 ```bash
-./gradlew bundleRelease     # → app/build/outputs/bundle/release/app-release.aab
+./gradlew bundlePlayRelease # → app/build/outputs/bundle/playRelease/app-play-release.aab
 ```
 
 Upload the **.aab**, not an APK — Play requires App Bundles for new apps.
@@ -77,7 +77,7 @@ Upload the **.aab**, not an APK — Play requires App Bundles for new apps.
 | Item | Status here | Action |
 |---|---|---|
 | Target API level | **34** ✅ | Play requires 35 from Aug 2025; bump `targetSdk` then |
-| App Bundle (.aab) | ✅ | `./gradlew bundleRelease` |
+| App Bundle (.aab) | ✅ | `./gradlew bundlePlayRelease` |
 | 64-bit support | ✅ n/a | no native code, so any device works |
 | Permissions | **none** ✅ | nothing to justify |
 | Ads / analytics / trackers | **none** ✅ | makes the Data safety form trivial |
@@ -181,7 +181,7 @@ Review usually takes a few days for a first submission.
 #      versionCode 2
 #      versionName "1.1"
 # 3.
-./gradlew bundleRelease
+./gradlew bundlePlayRelease
 # 4. upload the new .aab to a release track
 ```
 

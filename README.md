@@ -90,8 +90,8 @@ around **1.6 MB**.
 ### Release APK / Play Store bundle
 
 ```bash
-./gradlew assembleRelease      # → app/build/outputs/apk/release/
-./gradlew bundleRelease        # → app/build/outputs/bundle/release/  (Play Store)
+./gradlew assembleGithubRelease  # → app/build/outputs/apk/github/release/  (sideload, self-updating)
+./gradlew bundlePlayRelease      # → app/build/outputs/bundle/playRelease/  (Play Store, no self-updater)
 ```
 
 Before publishing, add your signing key to `app/build.gradle`:
