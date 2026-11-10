@@ -492,3 +492,13 @@ body.touch .sub{font-size:10px}
 /* device line in the settings panel: what to send when reporting a problem */
 .panel-info{margin-top:8px;font:10.5px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#8fa3b5;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text}
 .boot-msg.warn{color:#ffcf8a;line-height:1.5;max-width:460px;margin-left:auto;margin-right:auto}
+
+/* performance test results */
+#benchBox{position:fixed;z-index:95;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;
+  background:rgba(8,12,16,.96);border:1px solid var(--edge);border-radius:14px;padding:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#benchBox[hidden]{display:none}
+#benchBox pre{margin:0;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;color:#d8e4ee;white-space:pre-wrap}
+#benchBox button{margin-top:12px;padding:9px 22px;border:0;border-radius:99px;cursor:pointer;
+  font:700 12px/1 inherit;letter-spacing:.1em;color:#20140a;background:linear-gradient(180deg,#ffc069,var(--accent))}

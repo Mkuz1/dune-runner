@@ -53,6 +53,10 @@ function makeTerrainMaterial(tex) {
   mat.defines = {};
   if (tex.antiTile) mat.defines.ANTI_TILE = '';
   if (tex.beach) mat.defines.HAS_BEACH = '';
+  /* Phones and tablets: read only the layers that are actually present at
+     each pixel, and skip the far-distance blend, the close-up detail layers
+     and the second macro sample — about 5 texture reads instead of 25. */
+  if (tex.lite) mat.defines.TERRAIN_LITE = '';
 
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
@@ -91,7 +95,9 @@ function makeTerrainMaterial(tex) {
           vec3 a = texture2D( t, uv ).rgb;
           // far away, blend in the same photo at a 55 m scale so distant
           // ground does not repeat every 16 m
+          #ifndef TERRAIN_LITE
           if ( farW > 0.01 ) a = mix( a, texture2D( t, vec2( -uv.y, uv.x ) * 0.29 + vec2( 0.37, 0.11 ) ).rgb, farW * 0.5 );
+          #endif
           #ifdef ANTI_TILE
             if ( w > 0.004 ) {
               vec3 b = texture2D( t, vec2( uv.y, -uv.x ) * 0.381 + 0.27 ).rgb;
@@ -137,19 +143,38 @@ function makeTerrainMaterial(tex) {
           humpW = smoothstep( 0.45, 0.12, ad ) * smoothstep( 0.30, 0.62, en * 0.75 );
         }
 
-        vec3 roadC = texture2D( tDirt, uvR ).rgb * gDirt;
+        vec3 roadC = vec3( 0.0 );
+        #ifdef TERRAIN_LITE
+        if ( sp.a > 0.004 ) {
+        #endif
+        roadC = texture2D( tDirt, uvR ).rgb * gDirt;
         roadC *= mix( 1.0, 0.74, rutW );                               // packed down, darker
+        #ifndef TERRAIN_LITE
         // worn and dusty patches along the way
         roadC *= 0.8 + 0.4 * texture2D( tMacro, vWPos.xz * 0.045 + 0.3 ).g;
+        #endif
         // the scan is quite red; real gravel tracks are a dusty grey-brown
         roadC = mix( vec3( dot( roadC, vec3( 0.2126, 0.7152, 0.0722 ) ) ), roadC, 0.5 ) * vec3( 1.0, 0.97, 0.92 );
+        #ifndef TERRAIN_LITE
         roadC = mix( roadC, texture2D( tGrass, uvR * 0.3 ).rgb * gGrass, humpW * 0.6 );
+        #else
+        }
+        #endif
 
         /* ---- beach: real coastal sand on the shoreline band ---- */
         float beachW = 0.0;
-        vec3 sandC = layer( tSand, uvA, tileW ) * gSand;
         #ifdef HAS_BEACH
           beachW = 1.0 - smoothstep( 3.5, 8.5, vWPos.y );
+        #endif
+        #ifdef TERRAIN_LITE
+          vec3 terra = roadC * sp.a;
+          if ( sp.r > 0.004 ) terra += texture2D( tGrass, uvA ).rgb * gGrass * sp.r;
+          if ( sp.g > 0.004 ) terra += ( beachW > 0.5 ? texture2D( tBeach, uvA * 1.07 ).rgb * gBeach
+                                                       : texture2D( tSand, uvA ).rgb * gSand ) * sp.g;
+          if ( sp.b > 0.004 ) terra += texture2D( tRock, uvC ).rgb * gRock * sp.b;
+        #else
+        vec3 sandC = layer( tSand, uvA, tileW ) * gSand;
+        #ifdef HAS_BEACH
           if ( beachW > 0.001 ) sandC = mix( sandC, texture2D( tBeach, uvA * 1.07 ).rgb * gBeach, beachW );
         #endif
 
@@ -158,10 +183,14 @@ function makeTerrainMaterial(tex) {
             sandC * sp.g +
             layer( tRock,  uvC, tileW ) * gRock  * sp.b +
             roadC * sp.a;
+        #endif
 
         // a second, much finer layer that only shows up close, so the
         // ground keeps texture right under the wheels
         float near = 1.0 - smoothstep( 8.0, 46.0, length( vViewPosition ) );
+        #ifdef TERRAIN_LITE
+          near = 0.0;
+        #endif
         if ( near > 0.001 ) {
           vec3 fine =
               texture2D( tGrass, uvD ).rgb * gGrass * sp.r +
@@ -173,7 +202,11 @@ function makeTerrainMaterial(tex) {
 
         // two unrelated scales (128 m and ~550 m) so the brightness
         // variation itself never lines up into a grid
+        #ifdef TERRAIN_LITE
+        float macro = texture2D( tMacro, uvM ).g;
+        #else
         float macro = texture2D( tMacro, uvM ).g * 0.55 + texture2D( tMacro, vec2( uvM.y, -uvM.x ) * 0.231 + 0.17 ).g * 0.45;
+        #endif
         terra *= 0.76 + 0.48 * macro;
 
         // ambient occlusion baked from the terrain's own curvature
@@ -197,6 +230,18 @@ function makeTerrainMaterial(tex) {
         roughnessFactor = mix( roughnessFactor, 0.42, snow );`)
 
       .replace('#include <normal_fragment_maps>', `
+        float nFade = 1.0 - smoothstep( 70.0, 420.0, length( vViewPosition ) );
+        #ifdef TERRAIN_LITE
+        // one normal read for the dominant layer, and none in the distance
+        vec3 mapN = vec3( 0.0, 0.0, 1.0 );
+        if ( nFade > 0.01 ) {
+          float m = max( max( sp.r, sp.g ), max( sp.b, sp.a ) );
+          mapN = ( m == sp.r ? texture2D( nGrass, uvA ).xyz
+                 : m == sp.g ? texture2D( nSand, uvA ).xyz
+                 : m == sp.b ? texture2D( nRock, uvC ).xyz
+                             : texture2D( nDirt, uvR ).xyz ) * 2.0 - 1.0;
+        }
+        #else
         vec3 mapN = normalize(
             ( texture2D( nGrass, uvA ).xyz * 2.0 - 1.0 ) * sp.r +
             mix( texture2D( nSand, uvA ).xyz, texture2D( nBeach, uvA * 1.07 ).xyz, beachW * 0.85 ) * 2.0 * sp.g - sp.g +
@@ -209,12 +254,12 @@ function makeTerrainMaterial(tex) {
             ( texture2D( nRock,  uvD ).xyz * 2.0 - 1.0 ) * sp.b +
             ( texture2D( nDirt,  uvR * 4.0 ).xyz * 2.0 - 1.0 ) * sp.a );
         mapN = normalize( mapN + fineN * near * 0.8 );
-        float nFade = 1.0 - smoothstep( 70.0, 420.0, length( vViewPosition ) );
+        #endif
         mapN.xy *= normalScale * nFade;
         normal = normalize( tbn * mapN );`);
   };
 
-  mat.customProgramCacheKey = () => 'duneRunnerTerrain';
+  mat.customProgramCacheKey = () => 'duneRunnerTerrain' + (tex.lite ? '_lite' : '');
   return mat;
 }
 

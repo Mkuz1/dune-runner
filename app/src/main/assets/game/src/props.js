@@ -477,7 +477,8 @@ export function buildPropLibrary(textures, quality) {
   }), clock, 1.4, 0.7);
 
   // photo surface detail: six to nine extra texture reads, so not on low
-  if (!quality || quality.tier !== 'low') {
+  // and not on phones/tablets, where the plants are lite and small anyway
+  if (!quality || (quality.tier !== 'low' && !quality.isPhone)) {
     addDetail(mat, textures, 'static');
     addDetail(foliageMat, textures, 'foliage');
   }

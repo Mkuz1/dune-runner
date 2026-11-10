@@ -45,6 +45,8 @@ export class Settings {
 
     this.btnSound.addEventListener('click', () => this.setMuted(!this.muted));
     this.btnGfx.addEventListener('click', () => this.toggle());
+    const bench = document.getElementById('benchBtn');
+    if (bench) bench.addEventListener('click', () => this.runBench());
     document.addEventListener('pointerdown', (e) => {
       if (this.panel.hidden) return;
       if (!this.panel.contains(e.target) && e.target !== this.btnGfx && !this.btnGfx.contains(e.target)) {
@@ -54,6 +56,30 @@ export class Settings {
 
     this.refresh();
     this.apply();
+  }
+
+  /** Settings ▸ Run performance test: times each part of the scene. */
+  async runBench() {
+    this.toggle(false);
+    let box = document.getElementById('benchBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'benchBox';
+      document.body.appendChild(box);
+    }
+    box.innerHTML = '<pre></pre><button type="button" hidden>Close</button>';
+    const pre = box.firstChild, close = box.lastChild;
+    box.hidden = false;
+    pre.textContent = 'Starting the performance test — about 20 seconds. Keep the tablet still.';
+    close.onclick = () => { box.hidden = true; };
+    try {
+      const { runBenchmark } = await import('./bench.js');
+      pre.textContent = await runBenchmark(this.game, (m) => { pre.textContent = m; });
+      pre.textContent += '\n\nTake a screenshot of this and send it.';
+    } catch (e) {
+      pre.textContent = 'The test failed: ' + (e && e.message ? e.message : e);
+    }
+    close.hidden = false;
   }
 
   toggle(force) {
