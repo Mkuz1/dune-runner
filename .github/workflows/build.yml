@@ -13,7 +13,7 @@
 #                               to main publish the signed APK + IPA there with
 #                               the version.json the in-app updater reads
 # Optional repository variable:
-#   CF_PAGES_PROJECT         -> Cloudflare Pages project name (default: fjmk)
+#   CF_PAGES_PROJECT         -> Cloudflare Pages project name (default: dunerunner)
 #   RELEASES_REPO            -> where updates are published (default:
 #                               <owner>/dune-runner-release). The apps and the
 #                               website read version.json from Mkuz1/dune-runner-release
@@ -136,7 +136,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@3 pages deploy app/src/main/assets/game --project-name="${{ vars.CF_PAGES_PROJECT || 'fjmk' }}" --branch=main
+        run: npx --yes wrangler@3 pages deploy app/src/main/assets/game --project-name="${{ vars.CF_PAGES_PROJECT || 'dunerunner' }}" --branch=main
       - name: Package the web build
         run: cd app/src/main/assets/game && zip -qr "$GITHUB_WORKSPACE/DuneRunner-web.zip" .
       - uses: actions/upload-artifact@v4
@@ -230,6 +230,8 @@ jobs:
             gh release create "$GITHUB_REF_NAME" dist/* --repo "$REPO" --title "Dune Runner $GITHUB_REF_NAME" --notes "$NOTES"
           else
             gh release delete latest --repo "$REPO" --cleanup-tag --yes || true
-            gh release create latest dist/* --repo "$REPO" --target "$GITHUB_SHA" --prerelease \
-              --title "Latest build (main)" --notes "$NOTES"
+            # a full release marked Latest, so the Releases page's "Latest" badge
+            # is the current build rather than the last hand-made tag
+            gh release create latest dist/* --repo "$REPO" --target "$GITHUB_SHA" --latest \
+              --title "Dune Runner 1.2.$GITHUB_RUN_NUMBER (latest build)" --notes "$NOTES"
           fi
