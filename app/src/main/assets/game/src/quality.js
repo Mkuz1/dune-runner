@@ -138,7 +138,10 @@ export function presetList() {
    pixels the GPU fills, not by the pixel ratio: a 2000-px-wide tablet at
    1.35x was drawing almost as many pixels as a desktop. Each tier gets a
    fixed number of drawn pixels instead, whatever the screen. */
-const PHONE_PIXELS = { low: 0.45e6, med: 0.65e6, high: 0.85e6, ultra: 1.05e6 };
+/* Raised after testing on an Adreno 610 tablet: it was limited by geometry,
+   not pixels, and at 0.45 MP a 13-inch screen looked blocky. The governor
+   still lowers this on devices where pixels really are the bottleneck. */
+const PHONE_PIXELS = { low: 0.80e6, med: 0.95e6, high: 1.10e6, ultra: 1.25e6 };
 
 /** The pixel ratio to start at for this preset on this screen. */
 export function basePixelRatio(q) {

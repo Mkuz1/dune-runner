@@ -55,7 +55,9 @@ class Game {
     let renderer;
     try {
       renderer = new THREE.WebGLRenderer({
-        canvas, antialias: false, powerPreference: 'high-performance',
+        /* Mobile GPUs are tile-based: 4x MSAA resolves on-chip and costs
+           very little, and without it a scaled-up mobile frame looks blocky. */
+        canvas, antialias: !!this.q.isPhone, powerPreference: 'high-performance',
         stencil: false, alpha: false
       });
     } catch (e) {
