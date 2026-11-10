@@ -187,6 +187,35 @@ canvas#scene{
 #volRange{width:150px;accent-color:var(--accent);height:16px}
 .panel-note{font-size:10px;color:#7f95a8;line-height:1.5;margin-top:2px}
 
+/* "Privacy policy" link: start screen and settings panel */
+.privacy-link{
+  display:inline-block;margin-top:10px;padding:6px 4px;border:0;background:none;cursor:pointer;
+  font:inherit;font-size:11px;letter-spacing:.08em;color:#8fa4b6;
+  text-decoration:underline;text-underline-offset:3px;pointer-events:auto;
+}
+.privacy-link:hover,.privacy-link:focus-visible{color:#e8eef3}
+.panel-link{margin-top:6px;padding:4px 0;font-size:10px}
+
+/* privacy policy overlay */
+#privacyOverlay{
+  position:fixed;inset:0;z-index:95;display:grid;place-items:center;
+  padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+          max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background:rgba(3,6,9,.72);pointer-events:auto;
+}
+#privacyOverlay[hidden]{display:none}
+.pv-box{
+  position:relative;width:min(720px, 100%);height:min(86vh, 100%);
+  border-radius:14px;overflow:hidden;background:#f7f4ee;
+  box-shadow:0 10px 40px rgba(0,0,0,.55);
+}
+.pv-box iframe{display:block;width:100%;height:100%;border:0;background:#f7f4ee}
+.pv-close{
+  position:absolute;top:8px;right:8px;z-index:1;width:40px;height:40px;border-radius:50%;
+  border:0;cursor:pointer;font:400 26px/1 system-ui,sans-serif;color:#e8eef3;
+  background:rgba(12,18,24,.85);
+}
+
 /* gauge */
 .hud-gauge{
   position:absolute;bottom:calc(18px + var(--safe-b));left:50%;transform:translateX(-50%);

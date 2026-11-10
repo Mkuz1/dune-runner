@@ -27,6 +27,7 @@
     <div id="bootMsg" class="boot-msg">Warming up the engine…</div>
     <button id="startBtn" class="start-btn" hidden>START ENGINE</button>
     <div id="bootVer" class="boot-ver">&nbsp;</div>
+    <button type="button" class="privacy-link" data-privacy>Privacy policy</button>
     <div class="boot-tips" id="bootTips">
       <div><b>W A S D</b> / arrows — drive &amp; steer</div>
       <div><b>F</b> — toggle flight mode &nbsp;·&nbsp; <b>SPACE</b> — climb higher</div>
@@ -79,6 +80,7 @@
       <input type="range" id="volRange" min="0" max="100" value="55" />
     </div>
     <div class="panel-note" id="gfxNote">Changing graphics reloads the world.</div>
+    <button type="button" class="privacy-link panel-link" data-privacy>Privacy policy</button>
   </div>
 
   <!-- Speed / altitude gauge -->
@@ -176,6 +178,15 @@
     }
   }, 9000);
 </script>
+<!-- Privacy policy, shown over the game (no navigation: works offline in the apps) -->
+<div id="privacyOverlay" role="dialog" aria-modal="true" aria-label="Privacy policy" hidden>
+  <div class="pv-box">
+    <button type="button" id="privacyClose" class="pv-close" aria-label="Close privacy policy">&times;</button>
+    <iframe id="privacyFrame" title="Privacy policy"></iframe>
+  </div>
+</div>
+
+<script type="module" src="./src/privacy.js"></script>
 <script type="module" src="./src/updates.js"></script>
 <script type="module" src="./src/main.js"></script>
 <script nomodule>
