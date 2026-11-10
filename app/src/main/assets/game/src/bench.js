@@ -62,6 +62,26 @@ export async function runBenchmark(game, onProgress) {
       terrainMeshes.forEach(m => { m.material = flat; });
       return () => terrainMeshes.forEach((m, i) => { m.material = keep[i]; });
     }],
+    ['Without sky', () => {
+      const sky = game.env.sky; sky.visible = false;
+      return () => { sky.visible = true; };
+    }],
+    ['Without clouds', () => {
+      const c = game.env.clouds; if (!c) return () => {};
+      c.visible = false; return () => { c.visible = true; };
+    }],
+    ['Simple lighting everywhere', () => {
+      const lam = new THREE.MeshLambertMaterial({ color: 0xbfae8a });
+      game.scene.overrideMaterial = lam;
+      return () => { game.scene.overrideMaterial = null; lam.dispose(); };
+    }],
+    ['No anti-aliasing (MSAA)', () => {
+      const c = game.post.composer; if (!c) return () => {};
+      const rts = [c.renderTarget1, c.renderTarget2];
+      const prev = rts.map(r => r.samples);
+      rts.forEach(r => { r.samples = 0; r.dispose(); });
+      return () => rts.forEach((r, i) => { r.samples = prev[i]; r.dispose(); });
+    }],
     ['Without shadows', () => {
       const a = R.shadowMap.autoUpdate; R.shadowMap.autoUpdate = false;
       return () => { R.shadowMap.autoUpdate = a; R.shadowMap.needsUpdate = true; };

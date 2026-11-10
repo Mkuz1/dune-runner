@@ -201,7 +201,7 @@ export class QualityGovernor {
        is nudged. On a phone a smooth frame matters more than holding the
        exact look, so the governor may go further there. */
     const strict = this.q.chosen && !this.q.isPhone;
-    const floor = strict ? 0.75 : (this.q.isPhone ? 0.70 : 0.62);
+    const floor = strict ? 0.75 : (this.q.isPhone ? 0.50 : 0.62);   // the probe below stops it where pixels are not the bottleneck
     const base = basePixelRatio(this.q);
 
     /* Did the last drop help? If the frame rate barely moved, this device is
