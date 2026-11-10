@@ -169,6 +169,20 @@ class Game {
     }
 
     setProgress(1, 'Ready');
+    /* Some Android WebViews fall back to software rendering (an outdated
+       "Android System WebView", or a GPU the browser has blocklisted). The
+       game then crawls at every setting, and nothing in the game can fix it,
+       so say so plainly. */
+    try {
+      const gl = renderer.getContext();
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      const gpu = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+      if (/swiftshader|llvmpipe|software|basic render/i.test(gpu)) {
+        bootMsg.innerHTML = 'Graphics are running in <b>software mode</b> on this device, so the game will be very slow.<br>' +
+          'Update <b>Android System WebView</b> and <b>Chrome</b> in the Play Store, then restart the game.';
+        bootMsg.classList.add('warn');
+      }
+    } catch (_) {}
     startBtn.hidden = false;
     startBtn.addEventListener('click', () => this.start(), { once: true });
 
