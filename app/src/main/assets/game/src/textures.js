@@ -448,7 +448,7 @@ export async function buildTextures(quality, onProgress = () => {}) {
   const size = quality.texSize;         // 1024 ultra … 320 low
   const aniso = quality.aniso;
   const photoMax = quality.tier === 'low' ? 512 : 1024;
-  const out = { gain: {}, photoMean: {}, antiTile: quality.tier !== 'low' && !quality.isPhone, lite: !!quality.isPhone };   // 4 extra reads per ground pixel
+  const out = { gain: {}, photoMean: {}, antiTile: quality.tier !== 'low' && !quality.isPhone, lite: !!quality.isPhone, flat: !!quality.isPhone && (quality.tier === 'low' || quality.tier === 'med') };   // 4 extra reads per ground pixel
   const steps = [
     ['sand',  bakeSand,  2.4, true],
     ['grass', bakeGrass, 1.9, true],

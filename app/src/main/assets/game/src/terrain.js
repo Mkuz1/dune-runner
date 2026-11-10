@@ -67,6 +67,11 @@ function makeTerrainMaterial(tex) {
      each pixel, and skip the far-distance blend, the close-up detail layers
      and the second macro sample — about 5 texture reads instead of 25. */
   if (tex.lite) mat.defines.TERRAIN_LITE = '';
+  /* Low/Medium on mobile: no per-pixel ground relief. The normal map read
+     and the derivative-based tangent frame it needs were a large part of the
+     ground's cost on an Adreno 610; the vertex normals and baked AO keep the
+     shape of the land. (The normal map stays set: it provides the UVs.) */
+  if (tex.flat) mat.defines.TERRAIN_FLAT = '';
 
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
@@ -240,6 +245,7 @@ function makeTerrainMaterial(tex) {
         roughnessFactor = mix( roughnessFactor, 0.42, snow );`)
 
       .replace('#include <normal_fragment_maps>', `
+        #ifndef TERRAIN_FLAT
         float nFade = 1.0 - smoothstep( 70.0, 420.0, length( vViewPosition ) );
         #ifdef TERRAIN_LITE
         // one normal read for the dominant layer, and none in the distance
@@ -266,10 +272,11 @@ function makeTerrainMaterial(tex) {
         mapN = normalize( mapN + fineN * near * 0.8 );
         #endif
         mapN.xy *= normalScale * nFade;
-        normal = normalize( tbn * mapN );`);
+        normal = normalize( tbn * mapN );
+        #endif`);
   };
 
-  mat.customProgramCacheKey = () => 'duneRunnerTerrain' + (tex.lite ? '_lite' : '');
+  mat.customProgramCacheKey = () => 'duneRunnerTerrain' + (tex.lite ? '_lite' : '') + (tex.flat ? '_flat' : '');
   return mat;
 }
 

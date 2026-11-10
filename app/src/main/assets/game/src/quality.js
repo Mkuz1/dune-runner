@@ -102,6 +102,7 @@ function forPhone(q) {
     q.bloom = false;
     q.finish = false;
     q.shadows = false;
+    q.clouds = false;        // ~3 ms for a thin layer that is barely seen while driving
   }
   // smooth alpha-tested leaf and grass edges with the MSAA that mobile has on
   q.alphaToCoverage = true;
