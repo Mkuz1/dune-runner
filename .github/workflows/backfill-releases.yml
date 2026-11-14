@@ -32,14 +32,14 @@ jobs:
           made=0
           while IFS=$'\t' read -r id num sha title; do
             tag="v1.2.$num"
-            if printf '%s\n' "$existing" | grep -qx "$tag"; then echo "skip $tag (exists)"; continue; fi
+            if printf '%s\n' "$existing" | grep -qxE "v?1\.2\.$num"; then echo "skip $tag (exists)"; continue; fi
             rm -rf dist && mkdir dist
             if ! gh run download "$id" --repo "$REPO" -D dl 2>/dev/null; then echo "skip $tag (artifacts expired)"; rm -rf dl; continue; fi
             find dl -type f -exec mv {} dist/ \;
             rm -rf dl
             ls dist | grep -q . || { echo "skip $tag (no files)"; continue; }
-            notes="$(printf '%s\n\nBuilt from %s. Backfilled from the build run %s.' "$title" "${sha::7}" "$id")"
-            gh release create "$tag" dist/* --repo "$REPO" --target "$sha" --latest=false \
+            notes="$(printf '%s\n\nBuilt from commit %s (https://github.com/%s/commit/%s), build run %s. The tag itself points at the commit that ran this backfill: the built-in token may not create tags on older commits whose workflow files differ.' "$title" "${sha::7}" "$REPO" "$sha" "$id")"
+            gh release create "$tag" dist/* --repo "$REPO" --target "$GITHUB_SHA" --latest=false \
               --title "Dune Runner 1.2.$num" --notes "$notes"
             made=$((made + 1))
           done < runs.tsv
