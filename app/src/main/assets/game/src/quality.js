@@ -40,6 +40,11 @@ const PRESETS = {
 
 const STORE = 'duneRunner.settings';
 
+/** iPhone, iPod, iPad — including iPadOS, which reports itself as a Mac. */
+export const IS_IOS = typeof navigator !== 'undefined' &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
 export function loadSettings() {
   try {
     const raw = localStorage.getItem(STORE);
@@ -104,8 +109,15 @@ function forPhone(q) {
     q.shadows = false;
     q.clouds = false;        // ~3 ms for a thin layer that is barely seen while driving
   }
-  // smooth alpha-tested leaf and grass edges with the MSAA that mobile has on
-  q.alphaToCoverage = true;
+  /* iPhone / iPad (also iPadOS, which reports itself as a Mac). WebKit can
+     show a half-updated canvas — a black rectangle anchored at the left edge,
+     sized like the new buffer — when the drawing buffer is resized during
+     play, which the governor did whenever it changed the render scale. On
+     iOS the resolution is fixed at start and only the frame-rate cap and
+     bloom are adjusted at run time. */
+  q.isIOS = IS_IOS;
+  // smooth alpha-tested leaf edges with the MSAA that mobile has on (not on iOS)
+  q.alphaToCoverage = !q.isIOS;
   /* Mobile lighting. The on-device test on an Adreno 610 showed physically
      based shading was ~60% of the frame (88 ms -> 36 ms with simple
      lighting). So on phones and tablets: Lambert shading for ground, plants,
@@ -269,6 +281,7 @@ export class QualityGovernor {
   }
 
   apply(base, composer) {
+    if (IS_IOS) { this.scale = 1; return; }   // never resize the canvas mid-game on iOS
     const pr = Math.max(0.45, base * this.scale);
     this.renderer.setPixelRatio(pr);
     if (composer) composer.resize();
