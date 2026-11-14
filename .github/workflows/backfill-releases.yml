@@ -1,0 +1,49 @@
+# One-off (safe to re-run): turn every past successful build of main into
+# its own GitHub Release, v1.2.<run>, using the APK / AAB / IPA / web zip that
+# run uploaded as artifacts. GitHub keeps artifacts for 90 days, so older
+# builds are skipped. Versions that already have a release are left alone.
+#
+# Run it from Actions > backfill-releases > Run workflow.
+
+name: backfill-releases
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Create a release for each past build
+        run: |
+          set -euo pipefail
+          existing="$(gh release list --repo "$REPO" --limit 500 --json tagName --jq '.[].tagName')"
+          gh run list --repo "$REPO" --workflow build.yml --branch main --status success --limit 200 \
+            --json databaseId,number,headSha,displayTitle \
+            --jq '.[] | [.databaseId, .number, .headSha, .displayTitle] | @tsv' | sort -t$'\t' -k2,2n > runs.tsv
+          cat runs.tsv
+          made=0
+          while IFS=$'\t' read -r id num sha title; do
+            tag="v1.2.$num"
+            if printf '%s\n' "$existing" | grep -qx "$tag"; then echo "skip $tag (exists)"; continue; fi
+            rm -rf dist && mkdir dist
+            if ! gh run download "$id" --repo "$REPO" -D dl 2>/dev/null; then echo "skip $tag (artifacts expired)"; rm -rf dl; continue; fi
+            find dl -type f -exec mv {} dist/ \;
+            rm -rf dl
+            ls dist | grep -q . || { echo "skip $tag (no files)"; continue; }
+            notes="$(printf '%s\n\nBuilt from %s. Backfilled from the build run %s.' "$title" "${sha::7}" "$id")"
+            gh release create "$tag" dist/* --repo "$REPO" --target "$sha" --latest=false \
+              --title "Dune Runner 1.2.$num" --notes "$notes"
+            made=$((made + 1))
+          done < runs.tsv
+          echo "created $made releases"
+          # the newest versioned release keeps the Latest badge
+          newest="$(gh release list --repo "$REPO" --limit 500 --json tagName --jq '[.[].tagName | select(startswith("v1.2."))] | sort_by(ltrimstr("v1.2.") | tonumber) | last')"
+          if [ -n "$newest" ] && [ "$newest" != "null" ]; then gh release edit "$newest" --repo "$REPO" --latest; fi

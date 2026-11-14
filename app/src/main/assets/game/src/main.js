@@ -4,6 +4,16 @@
 
 import * as THREE from '../libs/three/three.module.js';
 
+/* Never write an infinite colour. The scene renders into a half-float
+   buffer whose largest value is 65504; the sky's sun disk and a razor-thin
+   specular glint on the clear-coated paint can exceed it. The pixel then
+   holds Inf, and the bloom's separable blur smears it into a black
+   rectangle across much of the screen (seen on iPhone while flying towards
+   the sun). Clamping every material's output to 64 — still far brighter
+   than white after tone mapping — removes the source. Custom shaders (sky,
+   sea) get the same clamp where they are built. */
+THREE.ShaderChunk.opaque_fragment += '\ngl_FragColor.rgb = min( gl_FragColor.rgb, vec3( 64.0 ) );\n';
+
 import { detectQuality, QualityGovernor, basePixelRatio } from './quality.js';
 import { buildTextures } from './textures.js';
 import { buildPropLibrary } from './props.js';

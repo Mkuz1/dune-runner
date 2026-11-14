@@ -372,7 +372,7 @@ void main() {
   float fogF = 1.0 - exp( -pow( distC * uFogDensity, 2.0 ) );
   col = mix( col, uFogColor, clamp( fogF, 0.0, 1.0 ) );
 
-  gl_FragColor = vec4( col, alpha );
+  gl_FragColor = vec4( min( col, vec3( 64.0 ) ), alpha );   // no Inf into the half-float buffer
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

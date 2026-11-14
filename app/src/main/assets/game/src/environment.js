@@ -156,6 +156,15 @@ function installAerialPerspective() {
     #endif`;
 }
 
+/* The sun disk in three's Sky shader reaches values far above what a
+   half-float target can hold (65504); an Inf there turns into a black
+   rectangle once the bloom blurs it. Clamp before tone mapping. */
+function clampSky(mat) {
+  mat.fragmentShader = mat.fragmentShader.replace('#include <tonemapping_fragment>',
+    'gl_FragColor.rgb = min( gl_FragColor.rgb, vec3( 64.0 ) );\n\t#include <tonemapping_fragment>');
+  mat.needsUpdate = true;
+}
+
 export class Environment {
   constructor(scene, renderer, quality) {
     installAerialPerspective();
@@ -172,6 +181,7 @@ export class Environment {
     u.mieCoefficient.value = 0.0042;
     u.mieDirectionalG.value = 0.82;
     this.sky.name = 'sky-dome';
+    clampSky(this.sky.material);
     this.sky.material.depthWrite = false;
     scene.add(this.sky);
 
@@ -293,6 +303,7 @@ export class Environment {
     this.envScene = new THREE.Scene();
     this.envSky = new Sky();
     this.envSky.scale.setScalar(10000);
+    clampSky(this.envSky.material);
     this.envScene.add(this.envSky);
     this.envRT = null;
     this.lastEnvElev = -999;

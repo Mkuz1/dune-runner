@@ -219,21 +219,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           ls -la dist
-          NOTES="Built from ${GITHUB_SHA::7}.
+          V="1.2.$GITHUB_RUN_NUMBER"
+          FIRST="$(printf '%s' "$COMMIT_MSG" | head -n1)"
+          NOTES="${FIRST}
 
-          - DuneRunner-debug.apk: install directly on any Android phone (allow installs from unknown sources).
-          - DuneRunner-release*.apk: sideload build with the in-app updater (signed when the keystore secrets are set).
+          Built from ${GITHUB_SHA::7}.
+
+          - DuneRunner-release.apk: Android sideload build with the in-app updater (signed).
           - DuneRunner-play.aab: Google Play bundle, no self-updater.
-          - DuneRunner-unsigned.ipa: iPhone/iPad build. Apple requires signing before it will install: use Xcode, Sideloadly or AltStore with your Apple ID, or TestFlight with a developer account.
-          - DuneRunner-web.zip: the website build for Cloudflare Pages."
+          - DuneRunner-debug.apk: developer build; does not update over the release APK.
+          - DuneRunner-unsigned.ipa: iPhone/iPad build. Install with AltStore, SideStore or Sideloadly (Apple ID), or Xcode.
+          - DuneRunner-web.zip: the website build."
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             gh release create "$GITHUB_REF_NAME" dist/* --repo "$REPO" --title "Dune Runner $GITHUB_REF_NAME" --notes "$NOTES"
           else
-            gh release delete latest --repo "$REPO" --cleanup-tag --yes || true
-            # a full release marked Latest, so the Releases page's "Latest" badge
-            # is the current build rather than the last hand-made tag
-            gh release create latest dist/* --repo "$REPO" --target "$GITHUB_SHA" --latest \
-              --title "Dune Runner 1.2.$GITHUB_RUN_NUMBER (latest build)" --notes "$NOTES"
+            # Every build of main is kept as its own release, v1.2.<run>, marked
+            # Latest. (It used to overwrite a single moving "latest" release.)
+            gh release delete latest --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
+            gh release create "v$V" dist/* --repo "$REPO" --target "$GITHUB_SHA" --latest \
+              --title "Dune Runner $V" --notes "$NOTES"
           fi

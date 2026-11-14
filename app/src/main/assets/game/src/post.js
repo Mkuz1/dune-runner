@@ -110,6 +110,10 @@ export class Post {
 
     this.bloom = new UnrealBloomPass(size, quality.tier === 'ultra' ? 0.26 : 0.30, 0.70, 0.94);
     this.bloom.enabled = !!quality.bloom;
+    // belt and braces: whatever reaches the bloom is finite and bounded
+    this.bloom.materialHighPassFilter.fragmentShader = this.bloom.materialHighPassFilter.fragmentShader
+      .replace('vec4 texel = texture2D( tDiffuse, vUv );', 'vec4 texel = min( texture2D( tDiffuse, vUv ), vec4( 64.0 ) );');
+    this.bloom.materialHighPassFilter.needsUpdate = true;
     this.composer.addPass(this.bloom);
 
     this.output = new OutputPass();
