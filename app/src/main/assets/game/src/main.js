@@ -14,7 +14,7 @@ import * as THREE from '../libs/three/three.module.js';
    sea) get the same clamp where they are built. */
 THREE.ShaderChunk.opaque_fragment += '\ngl_FragColor.rgb = min( gl_FragColor.rgb, vec3( 64.0 ) );\n';
 
-import { detectQuality, QualityGovernor, basePixelRatio } from './quality.js';
+import { detectQuality, QualityGovernor, basePixelRatio, IS_IOS } from './quality.js';
 import { buildTextures } from './textures.js';
 import { buildPropLibrary } from './props.js';
 import { Terrain, HeightField, CHUNK } from './terrain.js';
@@ -254,6 +254,24 @@ class Game {
     return this.autoCap || 0;
   }
 
+  /* iPhone / iPad: read a few pixels of the frame back before the browser
+     presents it. WebKit sometimes put a frame on screen whose drawing was not
+     finished, which showed as a black square (about half the screen) around
+     the truck. On an iPhone the Black-square detector made it disappear: it
+     reads the canvas back every frame, which makes WebKit complete the frame
+     first. This does the same with a 4x4 copy and a 1-pixel read. */
+  iosPresentGuard() {
+    if (!this._guard) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 4;
+      this._guard = c.getContext('2d', { willReadFrequently: true });
+    }
+    try {
+      this._guard.drawImage(this.renderer.domElement, 0, 0, 4, 4);
+      this._guard.getImageData(0, 0, 1, 1);
+    } catch (_) { this._guardOff = true; }     // never let the guard break the game
+  }
+
   loop = (now) => {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
@@ -335,6 +353,7 @@ class Game {
     this.post.render(dt);
     // must run after the render, while the drawing buffer is still readable
     if (this.diag) this.diag.update();
+    else if (IS_IOS && !this._guardOff) this.iosPresentGuard();
   };
 }
 
