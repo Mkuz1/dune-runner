@@ -57,6 +57,12 @@ export class Settings {
 
     this.btnSound.addEventListener('click', () => this.setMuted(!this.muted));
     this.btnGfx.addEventListener('click', () => this.toggle());
+    const diagBtn = document.getElementById('diagBtn');
+    if (diagBtn) diagBtn.addEventListener('click', () => {
+      if (this.game.armDiag) this.game.armDiag();
+      this.toggle(false);
+      this.flash('Detector on — play until the black square appears, then screenshot');
+    });
     const bench = document.getElementById('benchBtn');
     if (bench) bench.addEventListener('click', () => this.runBench());
     document.addEventListener('pointerdown', (e) => {

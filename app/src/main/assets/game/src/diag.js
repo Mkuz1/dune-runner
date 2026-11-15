@@ -117,6 +117,11 @@ export class Diag {
       seen[i] = 0;
       if (dark[i]) n++;
     }
+    /* Live readout: how much of the canvas itself is black right now. If a
+       black square is on screen but this says ~0 %, the canvas is fine and
+       the black is added later, by the browser's compositor. */
+    this.darkPct = 100 * n / (W * H);
+    if (this.frames % 15 === 0) this.showStatus();
     if (n < MIN_AREA) return;
 
     let best = null;
@@ -184,7 +189,17 @@ export class Diag {
       `  tod ${h.timeOfDay}  missingChunks ${h.missingChunks}\n` +
       h.hitting.map(x => `   → ${x.n}/5 rays: ${x.what}  @${x.dist}m`).join('\n')
     ).join('\n\n');
-    this.el.textContent = `DIAG · ${this.hits.length} caught / ${this.frames} frames\n\n${last}`;
+    this.lastText = last;
+    this.showStatus();
+  }
+
+  showStatus() {
+    const g = this.game;
+    this.el.textContent =
+      `DIAG · canvas black now: ${(this.darkPct || 0).toFixed(1)} %  ·  ${this.hits.length} caught / ${this.frames} frames\n` +
+      `${g.q.tier}${g.q.isPhone ? ' mobile' : ''}${g.q.isIOS ? ' iOS' : ''} · bloom ${g.q.bloom ? 'on' : 'off'} · ` +
+      `post ${g.post && g.post.composer ? 'on' : 'off'} · ${g.renderer.domElement.width}x${g.renderer.domElement.height}` +
+      (this.lastText ? `\n\n${this.lastText}` : '\n\nNothing caught in the canvas yet.');
   }
 
   dump() {

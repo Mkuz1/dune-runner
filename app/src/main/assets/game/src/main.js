@@ -209,6 +209,7 @@ class Game {
       this.diag = new Diag(this);
       window.diag = this.diag;
     };
+    this.armDiag = armDiag;           // Settings > Black-square detector
     if (params.get('diag')) armDiag();
     if (this.hud.el.fps) {
       let taps = 0, last = 0;
