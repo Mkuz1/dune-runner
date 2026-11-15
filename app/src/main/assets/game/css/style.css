@@ -223,13 +223,18 @@ canvas#scene{
 }
 .gauge-svg{width:212px;height:161px;display:block;overflow:visible}
 .g-track{fill:none;stroke:rgba(255,255,255,.11);stroke-width:7;stroke-linecap:round}
+/* No CSS filter here (it used to be a drop-shadow glow). On iOS a filtered
+   element above the WebGL canvas gets its own compositor layer, and WebKit
+   painted that layer as a large black rectangle around the gauge while
+   driving and flying. The glow is now a wider, faint stroke underneath. */
 .g-fill{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round;
-  stroke-dasharray:0 400;filter:drop-shadow(0 0 8px rgba(255,138,41,.55));
-  transition:stroke .3s ease}
-.hud-gauge.fly .g-fill{stroke:var(--accent-2);filter:drop-shadow(0 0 8px rgba(57,212,255,.55))}
+  stroke-dasharray:0 400;transition:stroke .3s ease}
+.g-glow{fill:none;stroke:var(--accent);stroke-width:15;stroke-linecap:round;opacity:.22;
+  stroke-dasharray:0 400;transition:stroke .3s ease}
+.hud-gauge.fly .g-fill,.hud-gauge.fly .g-glow{stroke:var(--accent-2)}
 .gauge-read{position:absolute;left:0;right:0;top:62px;pointer-events:none}
 .gauge-val{font-size:42px;font-weight:800;line-height:1;letter-spacing:-.02em;
-  text-shadow:0 3px 22px rgba(0,0,0,.65)}
+  text-shadow:0 2px 6px rgba(0,0,0,.6)}
 .gauge-unit{font-size:10px;letter-spacing:.3em;color:#cfdde9;margin-top:3px;text-shadow:0 1px 4px rgba(0,0,0,.7)}
 .gauge-alt{margin-top:-16px;font-size:10.5px;letter-spacing:.18em;color:#cfdde9;
   text-shadow:0 1px 4px rgba(0,0,0,.7)}

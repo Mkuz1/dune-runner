@@ -24,6 +24,7 @@ export class Hud {
       unit: document.getElementById('speedUnit'),
       alt: document.getElementById('altRead'),
       fill: document.getElementById('gaugeFill'),
+      glow: document.getElementById('gaugeGlow'),
       boost: document.getElementById('boostFill'),
       gauge: document.querySelector('.hud-gauge'),
       hint: document.getElementById('hint'),
@@ -45,6 +46,7 @@ export class Hud {
     this.fpsAcc = 0;
     this.hintTimer = 12;
     this.el.fill.style.strokeDasharray = `0 ${GAUGE_LEN}`;
+    if (this.el.glow) this.el.glow.style.strokeDasharray = `0 ${GAUGE_LEN}`;
   }
 
   show() { this.el.root.hidden = false; }
@@ -202,6 +204,7 @@ export class Hud {
 
       const frac = clamp(this.smoothSpeed / (flying ? 400 : 240), 0, 1);
       this.el.fill.style.strokeDasharray = `${frac * GAUGE_LEN} ${GAUGE_LEN}`;
+      if (this.el.glow) this.el.glow.style.strokeDasharray = `${frac * GAUGE_LEN} ${GAUGE_LEN}`;
       this.el.boost.style.width = (phys.boost * 100).toFixed(0) + '%';
 
       this.el.gauge.classList.toggle('fly', flying);
