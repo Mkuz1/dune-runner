@@ -83,7 +83,12 @@ export class GrassField {
         const green = _sp[0], sand = _sp[1];
         if (green < 0.30 && sand < 0.55) continue;
         if (_S.trail > 0.3) continue;
-        if (sand > green && r3 > 0.15) continue;
+        // sand: only the odd dry tuft, never an even sprinkle of green spikes
+        if (sand > green && r3 > 0.045) continue;
+        /* grass grows in patches, not on a grid: a slow noise from the
+           lattice hash thins it to bare ground between clumps */
+        const patch = hash2(Math.floor(i / 6), Math.floor(j / 6)) * 0.65 + hash2(Math.floor(i / 2), Math.floor(j / 2)) * 0.35;
+        if (green >= sand && patch < 0.30) continue;
         if (h < 9 && sand > green) continue;          // bare sand on the beaches
         const vg = villageAt(x, z);
         if (vg && r3 < vg.w * 0.75) continue;      // mown around the houses        // only the odd tuft in the sand
@@ -97,12 +102,13 @@ export class GrassField {
         this.mesh.setMatrixAt(n, _m);
 
         // tint: lush green on soil, bleached straw on sand, plus variation
-        const dry = clamp(sand * 1.3, 0, 1);
+        // on sand the tufts are dead straw; on soil a mix of green and dry
+        const dry = clamp(sand * 1.6 + (r2 < 0.22 ? 0.45 : 0), 0, 1);
         const v = 0.80 + r1 * 0.40;
         this._c.setRGB(
-          (0.70 + dry * 0.46) * v,
-          (0.94 - dry * 0.20) * v,
-          (0.52 + dry * 0.10) * v
+          (0.70 + dry * 0.75) * v,
+          (0.94 - dry * 0.22) * v,
+          (0.52 - dry * 0.12) * v
         );
         this.mesh.setColorAt(n, this._c);
         n++;

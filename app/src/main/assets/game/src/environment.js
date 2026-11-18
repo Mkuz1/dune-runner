@@ -47,18 +47,28 @@ void main(){
   vec2 p = vUvW * 0.00042 + vec2( uTime * 0.0035, uTime * 0.0016 );
   float n = fbm( p * 2.0 );
   float n2 = fbm( p * 6.0 + n );
-  float d = smoothstep( 1.0 - uCover, 1.28 - uCover, n * 0.72 + n2 * 0.38 );
+  /* Separate fair-weather puffs with blue between them: a narrow edge band
+     (it was 0.28 wide, which spread every cloud into a thin veil) */
+  float shape = n * 0.72 + n2 * 0.38;
+  float d = smoothstep( 1.0 - uCover, 1.11 - uCover, shape );
 
+  /* The layer is a flat plane, so towards the horizon every cloud is seen
+     edge-on and they pile up into one white band. Fade them out with
+     distance and with how grazing the view is. */
   float dist = length( vW.xz - uCamPos.xz );
-  d *= smoothstep( 12000.0, 3000.0, dist );      // fade out at the horizon
+  vec3 toC = normalize( vW - uCamPos );
+  d *= smoothstep( 9000.0, 2500.0, dist ) * smoothstep( 0.06, 0.20, toC.y );
   if ( d < 0.004 ) discard;
 
-  float lit = clamp( n2 * 1.5, 0.25, 1.0 );
-  vec3 col = mix( uSkyTint * 0.62, vec3( 1.0 ), lit );
+  // denser cores are brighter on top and greyer underneath
+  float core = smoothstep( 1.0 - uCover, 1.30 - uCover, shape );
+  float lit = clamp( 0.55 + n2 * 0.7 - core * 0.25, 0.35, 1.0 );
+  vec3 col = mix( uSkyTint * 0.55, vec3( 1.0 ), lit );
   col = mix( col, uSunColor, 0.28 * pow( clamp( uSunDir.y, 0.0, 1.0 ), 0.5 ) );
-  col *= mix( 1.0, 0.22, uNight );
+  // at night clouds are faint grey shapes, not white smears on a black sky
+  col *= mix( 1.0, 0.045, uNight );
 
-  gl_FragColor = vec4( col, d * 0.82 );
+  gl_FragColor = vec4( col, d * 0.82 * ( 1.0 - uNight * 0.45 ) );
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -159,9 +169,12 @@ function installAerialPerspective() {
 /* The sun disk in three's Sky shader reaches values far above what a
    half-float target can hold (65504); an Inf there turns into a black
    rectangle once the bloom blurs it. Clamp before tone mapping. */
-function clampSky(mat) {
-  mat.fragmentShader = mat.fragmentShader.replace('#include <tonemapping_fragment>',
-    'gl_FragColor.rgb = min( gl_FragColor.rgb, vec3( 64.0 ) );\n\t#include <tonemapping_fragment>');
+function clampSky(mat, gain = 1) {
+  mat.uniforms.uSkyGain = { value: gain };
+  mat.fragmentShader = mat.fragmentShader
+    .replace('void main() {', 'uniform float uSkyGain;\nvoid main() {')
+    .replace('#include <tonemapping_fragment>',
+      'gl_FragColor.rgb = min( gl_FragColor.rgb * uSkyGain, vec3( 64.0 ) );\n\t#include <tonemapping_fragment>');
   mat.needsUpdate = true;
 }
 
@@ -181,7 +194,11 @@ export class Environment {
     u.mieCoefficient.value = 0.0042;
     u.mieDirectionalG.value = 0.82;
     this.sky.name = 'sky-dome';
-    clampSky(this.sky.material);
+    /* The visible sky at 0.42x. The scene is exposed for the lit ground, and
+       at that exposure the physically scaled sky tone-mapped to near white
+       (measured 242,241,236 straight up at 08:30): a milky, overcast look on
+       a clear day. The reflection probe below keeps the full sky. */
+    clampSky(this.sky.material, 0.42);
     this.sky.material.depthWrite = false;
     scene.add(this.sky);
 
@@ -281,7 +298,7 @@ export class Environment {
         uSunDir: { value: new THREE.Vector3(0, 1, 0) },
         uSunColor: { value: new THREE.Color(1, 1, 1) },
         uSkyTint: { value: new THREE.Color(0.7, 0.8, 0.95) },
-        uCover: { value: 0.44 },
+        uCover: { value: 0.36 },
         uNight: { value: 0 },
         uCamPos: { value: new THREE.Vector3() }
       };
@@ -340,9 +357,13 @@ export class Environment {
     // sky
     const su = this.sky.material.uniforms;
     su.sunPosition.value.copy(this.sunDir).multiplyScalar(40000);
-    su.turbidity.value = 2.6 + golden * 5.0;
-    su.rayleigh.value = 0.9 + golden * 2.0 + this.night * 0.35;
-    su.mieCoefficient.value = 0.0030 + golden * 0.007;
+    /* clearer daytime air: a deeper blue overhead and a whiter, not milky,
+       horizon; dawn and dusk keep their dust and colour */
+    su.turbidity.value = 2.0 + golden * 4.6;
+    su.rayleigh.value = 1.3 + golden * 1.7 + this.night * 0.35;
+    su.mieCoefficient.value = 0.0024 + golden * 0.0072;
+    // the daytime sky is dimmed to read blue (see clampSky); not at night
+    if (su.uSkyGain) su.uSkyGain.value = 0.42 + 0.58 * this.night;
 
     // colours used by water, fog and the HUD
     this.sunColor.setRGB(
@@ -352,7 +373,9 @@ export class Environment {
     );
     const dayTop = new THREE.Color(0.13, 0.32, 0.66);
     const nightTop = new THREE.Color(0.014, 0.028, 0.075);
-    const duskTop = new THREE.Color(0.14, 0.13, 0.30);
+    // matches the rendered dawn/dusk sky overhead (blue-teal); the old violet
+    // made the sea, which reflects this colour, turn purple at sunrise
+    const duskTop = new THREE.Color(0.15, 0.22, 0.38);
     this.skyTop.copy(nightTop).lerp(duskTop, 1 - this.night).lerp(dayTop, smoothstep(0.05, 0.42, up));
 
     const dayHz = new THREE.Color(0.66, 0.78, 0.92);
@@ -364,7 +387,8 @@ export class Environment {
 
     // fog follows the horizon so distance always reads correctly
     this.fogColor.copy(this.skyHorizon).lerp(this.skyTop, 0.34).multiplyScalar(0.92);
-    this.fogDensity = this.q.fogDensity * (1 + this.night * 0.5);
+    // a quarter less haze than before, so distant ridges keep their contrast
+    this.fogDensity = this.q.fogDensity * 0.75 * (1 + this.night * 0.5);
     if (this.scene.fog) {
       this.scene.fog.color.copy(this.fogColor);
 
@@ -387,10 +411,12 @@ export class Environment {
        scene is exposed low and the analytic lights are scaled up to match;
        otherwise the sky blows out to white. */
     const sunI = clamp(smoothstep(-0.06, 0.22, up), 0, 1);
-    this.sun.intensity = 0.25 + sunI * 5.4;
+    // stronger sun against a weaker sky fill: real daylight contrast and
+    // shadows that read as shadows (sky : sun was ~1 : 4, now ~1 : 6)
+    this.sun.intensity = 0.25 + sunI * 6.1;
     this.sun.color.copy(this.sunColor);
     // without sky reflections and the fill light, mobile gets more ambient
-    this.hemi.intensity = (0.30 + sunI * 1.30) * (this.q && this.q.simpleLighting ? 1.7 : 1);
+    this.hemi.intensity = (0.28 + sunI * 1.02) * (this.q && this.q.simpleLighting ? 2.0 : 1);
     this.hemi.color.copy(this.skyHorizon).multiplyScalar(1.5);
     this.hemi.groundColor.setRGB(0.18 + sunI * 0.14, 0.15 + sunI * 0.12, 0.11 + sunI * 0.09);
     if (this.fill) this.fill.intensity = 0.10 + sunI * 0.42;

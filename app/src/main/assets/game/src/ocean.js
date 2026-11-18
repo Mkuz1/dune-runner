@@ -339,6 +339,9 @@ void main() {
   bedCol += uSunColor * caus * 0.55 * smoothstep( 6.0, 0.4, depth ) * ( 1.0 - uNight );
 
   vec3 water = mix( uDeep, uShallow, exp( -depth * 0.16 ) );
+  // the water's own colour is scattered daylight: it goes dark at night
+  // (it used to stay day-blue and glowed brighter than the land)
+  water *= mix( 1.0, 0.07, uNight * uNight );   // gently through dusk, dark at night
   vec3 body  = bedCol * absorb + water * ( 1.0 - absorb );
 
   // light scattering up through the back of a swell
