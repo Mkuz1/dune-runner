@@ -47,10 +47,15 @@ export class Diag {
 
     this.el = document.createElement('div');
     this.el.style.cssText =
-      'position:fixed;left:8px;top:8px;z-index:99;max-width:min(560px,92vw);' +
-      'font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:#b9f6c4;' +
-      'background:rgba(6,10,14,.92);border:1px solid rgba(120,255,170,.35);' +
-      'border-radius:8px;padding:9px 11px;white-space:pre-wrap;pointer-events:none';
+      /* small and see-through, at the bottom between the touch controls, so
+         it never covers what it is looking for (it used to fill the top half
+         of a phone screen — exactly where the iPhone black square appears) */
+      'position:fixed;left:50%;transform:translateX(-50%);' +
+      'bottom:calc(6px + env(safe-area-inset-bottom, 0px));z-index:99;width:min(330px,50vw);' +
+      'font:9.5px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#d6ffe0;' +
+      'background:rgba(0,0,0,.42);border:1px solid rgba(120,255,170,.35);' +
+      'border-radius:6px;padding:5px 7px;white-space:pre-wrap;pointer-events:none;' +
+      'text-shadow:0 1px 2px #000';
     this.el.textContent = 'DIAG armed — fly around. Nothing caught yet.';
     document.body.appendChild(this.el);
 
@@ -121,6 +126,7 @@ export class Diag {
        black square is on screen but this says ~0 %, the canvas is fine and
        the black is added later, by the browser's compositor. */
     this.darkPct = 100 * n / (W * H);
+    this.maxDark = Math.max(this.maxDark || 0, this.darkPct);
     if (this.frames % 15 === 0) this.showStatus();
     if (n < MIN_AREA) return;
 
@@ -181,6 +187,7 @@ export class Diag {
       hitting: [...seenWhat.values()].sort((a, b) => b.n - a.n)
     };
     this.hits.push(rec);
+    if (!this.worstRec || rec.pctOfScreen > this.worstRec.pctOfScreen) this.worstRec = rec;
     if (this.hits.length > 60) this.hits.shift();
 
     const last = this.hits.slice(-3).reverse().map(h =>
@@ -194,12 +201,14 @@ export class Diag {
   }
 
   showStatus() {
-    const g = this.game;
+    const g = this.game, w = this.worstRec;
+    const short = (t) => t.replace(/ · BufferGeometry| · verts=\d+| · map=NULL/g, '').slice(0, 90);
     this.el.textContent =
-      `DIAG · canvas black now: ${(this.darkPct || 0).toFixed(1)} %  ·  ${this.hits.length} caught / ${this.frames} frames\n` +
-      `${g.q.tier}${g.q.isPhone ? ' mobile' : ''}${g.q.isIOS ? ' iOS' : ''} · bloom ${g.q.bloom ? 'on' : 'off'} · ` +
-      `post ${g.post && g.post.composer ? 'on' : 'off'} · ${g.renderer.domElement.width}x${g.renderer.domElement.height}` +
-      (this.lastText ? `\n\n${this.lastText}` : '\n\nNothing caught in the canvas yet.');
+      `canvas black: now ${(this.darkPct || 0).toFixed(1)}% · max ${(this.maxDark || 0).toFixed(1)}%\n` +
+      `${g.q.tier}${g.q.isIOS ? ' iOS' : ''} · post ${g.post && g.post.composer ? 'on' : 'off'} · bloom ${g.q.bloom ? 'on' : 'off'} · ${g.renderer.domElement.width}x${g.renderer.domElement.height}\n` +
+      (w ? `biggest block: ${w.pctOfScreen}% of screen, ${w.box}\n` +
+           `${w.flying ? 'flying' : 'ground'} · ${short(w.hitting[0].what)} @${w.hitting[0].dist}m`
+         : 'no solid block in the canvas yet');
   }
 
   dump() {
