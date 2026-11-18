@@ -15,7 +15,7 @@
        when CACHE is bumped, and they are the bulk of the bytes.
 
    Bump CACHE on every deploy. */
-const CACHE = 'dune-runner-v31';
+const CACHE = 'dune-runner-v32';
 const ASSETS = [
   "./",
   "./index.html",

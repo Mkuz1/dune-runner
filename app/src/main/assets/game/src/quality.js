@@ -133,11 +133,27 @@ function forPhone(q) {
   return q;
 }
 
+/* iPhone / iPad: draw straight to the canvas, never through the
+   post-processing chain (half-float MSAA targets -> bloom -> output ->
+   finish). On an iPhone a black square, about half the screen high, kept
+   appearing when flying towards the sun on High/Ultra (the detector showed
+   "post on"); it never appeared on Android or desktop, and Medium on mobile
+   already renders directly. Tone mapping and colour are unchanged; only
+   bloom and the grain/vignette/sharpen pass are lost on iOS. */
+function forIOS(q) {
+  if (!IS_IOS) return q;
+  q.isIOS = true;
+  q.bloom = false;
+  q.smaa = false;
+  q.finish = false;
+  return q;
+}
+
 export function detectQuality(override) {
   const pick = PRESETS[override] ? override : loadSettings().quality;
   if (pick && PRESETS[pick]) {
     const q = { ...PRESETS[pick], chosen: true };
-    return isPhoneDevice() ? forPhone(q) : q;
+    return forIOS(isPhoneDevice() ? forPhone(q) : q);
   }
 
   const ua = navigator.userAgent;
@@ -161,7 +177,7 @@ export function detectQuality(override) {
 
   const q = { ...PRESETS[tier] };
   q.gpu = gpu;
-  return isPhone ? forPhone(q) : q;
+  return forIOS(isPhone ? forPhone(q) : q);
 }
 
 export function presetList() {
