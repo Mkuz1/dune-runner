@@ -507,3 +507,4 @@ body.touch .sub{font-size:10px}
 #benchBox pre{margin:0;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;color:#d8e4ee;white-space:pre-wrap}
 #benchBox button{margin-top:12px;padding:9px 22px;border:0;border-radius:99px;cursor:pointer;
   font:700 12px/1 inherit;letter-spacing:.1em;color:#20140a;background:linear-gradient(180deg,#ffc069,var(--accent))}
+.more-apps-link[hidden]{display:none}
