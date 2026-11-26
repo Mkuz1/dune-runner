@@ -28,6 +28,9 @@
     <button id="startBtn" class="start-btn" hidden>START ENGINE</button>
     <div id="bootVer" class="boot-ver">&nbsp;</div>
     <button type="button" class="privacy-link" data-privacy>Privacy policy</button>
+    <a class="privacy-link more-apps-link" id="moreApps" href="https://www.koussa.net/" target="_blank" rel="noopener" hidden>More free apps by MK at www.koussa.net</a>
+    <script>/* website only: the Android and iPhone apps load this page from their own assets */
+      if (/^https?:$/.test(location.protocol) && !/androidplatform\.net$|^localhost$|^127\./.test(location.hostname)) document.getElementById('moreApps').hidden = false;</script>
     <div class="boot-tips" id="bootTips">
       <div><b>W A S D</b> / arrows — drive &amp; steer</div>
       <div><b>F</b> — toggle flight mode &nbsp;·&nbsp; <b>SPACE</b> — climb higher</div>
