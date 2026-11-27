@@ -20,6 +20,7 @@ Open-world off-road driving and flight game: one game, three targets (web, Andro
 
 ## Recent changes
 
+- 2026-11-27: **Website security headers** (MK Apps security review): CSP, HSTS, X-Frame-Options DENY, nosniff, Referrer-Policy and Permissions-Policy for every page, in `app/src/main/assets/game/_headers`. The CSP lists exactly the hosts the site uses (Google Fonts, GitHub API, Cloudflare Web Analytics); if you add a new script, font, embed or API host, add it to the CSP or it will be blocked.
 - 2026-11-26: Play Store graphics (PR #1); koussa.net invite (PR #2); SEO/share previews (PR #3), shipped as build 1.2.41.
 - 2026-11-18: More realistic look (sky, clouds, daylight, desert scrub); iOS black-square fixes.
 
